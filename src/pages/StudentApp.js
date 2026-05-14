@@ -1,22 +1,14 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/config";
 import QRScanner from "./QRScanner";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { Avatar, PhotoUploader } from "../components/PhotoUploader";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 
 const COLORS = {
   present: "#22c55e", late: "#f59e0b", absent: "#ef4444", excused: "#3b82f6",
   presentBg: "#dcfce7", lateBg: "#fef3c7", absentBg: "#fee2e2", excusedBg: "#dbeafe",
 };
 
-function Avatar({ name = "?", size = 36, style = {} }) {
-  const colors = ["#4f46e5","#0891b2","#059669","#d97706","#dc2626","#7c3aed","#db2777"];
-  const idx = (name.charCodeAt(0) || 0) % colors.length;
-  return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: colors[idx], display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: size * 0.35, flexShrink: 0, ...style }}>
-      {name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-    </div>
-  );
-}
 
 function StatusBadge({ status }) {
   const cfg = {
@@ -361,20 +353,25 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
           {page === "settings" && (
             <div>
               <div style={card}>
-                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>My Profile</h3>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderBottom: `1px solid ${border}`, marginBottom: 12 }}>
-                  <Avatar name={user.name} size={56} />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 17 }}>{user.name}</div>
-                    <div style={{ color: textMuted, fontSize: 13 }}>{user.email}</div>
-                    {studentInfo && <div style={{ color: textMuted, fontSize: 13 }}>ID: {studentInfo.studentId} · {studentInfo.section}</div>}
-                    <span style={{ background: "#dbeafe", color: "#1e40af", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>Student</span>
-                  </div>
+                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>👤 My Profile</h3>
+                <PhotoUploader
+                  userId={user.uid}
+                  currentPhotoURL={user.photoURL}
+                  userName={user.name}
+                  collection="users"
+                  dark={dark}
+                  onUploadComplete={(url) => notify("Profile photo updated! ✅")}
+                />
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${border}` }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{user.name}</div>
+                  <div style={{ color: textMuted, fontSize: 13 }}>{user.email}</div>
+                  {studentInfo && <div style={{ color: textMuted, fontSize: 13 }}>ID: {studentInfo.studentId} · {studentInfo.section}</div>}
+                  <span style={{ background: "#dbeafe", color: "#1e40af", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 700, marginTop: 4, display: "inline-block" }}>Student</span>
                 </div>
               </div>
 
               <div style={card}>
-                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>Appearance</h3>
+                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>🎨 Appearance</h3>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
                     <div style={{ fontWeight: 600 }}>Dark Mode</div>
@@ -387,7 +384,7 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
               </div>
 
               <div style={card}>
-                <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700 }}>Attendance Policy</h3>
+                <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700 }}>📋 Attendance Policy</h3>
                 <div style={{ fontSize: 14, color: textMuted, lineHeight: 1.7 }}>
                   <div>📌 Minimum required attendance: <strong style={{ color: text }}>75%</strong></div>
                   <div>📌 Students below 75% will be flagged as "At Risk"</div>

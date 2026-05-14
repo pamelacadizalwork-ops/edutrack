@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/config";
 import QRGenerator from "./QRGenerator";
+import { Avatar, PhotoUploader, SmallPhotoUploader } from "../components/PhotoUploader";
 import {
   collection, addDoc, getDocs, doc, setDoc, getDoc,
   query, where, orderBy, onSnapshot, deleteDoc, updateDoc, serverTimestamp
@@ -11,15 +12,6 @@ const COLORS = {
   presentBg: "#dcfce7", lateBg: "#fef3c7", absentBg: "#fee2e2", excusedBg: "#dbeafe",
 };
 
-function Avatar({ name = "?", size = 36, style = {} }) {
-  const colors = ["#4f46e5","#0891b2","#059669","#d97706","#dc2626","#7c3aed","#db2777"];
-  const idx = (name.charCodeAt(0) || 0) % colors.length;
-  return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: colors[idx], display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: size * 0.35, flexShrink: 0, ...style }}>
-      {name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-    </div>
-  );
-}
 
 function StatusBadge({ status }) {
   const cfg = { present: { bg: COLORS.presentBg, color: "#166534", label: "Present" }, late: { bg: COLORS.lateBg, color: "#92400e", label: "Late" }, absent: { bg: COLORS.absentBg, color: "#991b1b", label: "Absent" }, excused: { bg: COLORS.excusedBg, color: "#1e40af", label: "Excused" } };
@@ -393,12 +385,12 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
 
           {/* QR ATTENDANCE */}
           {page === "qr" && (
-            <QRAttendancePage
+            <QRGenerator
               user={user}
               classes={classes}
               students={students}
               dark={dark}
-              notify={notify}
+
             />
           )}
 
@@ -569,7 +561,14 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                 const rate = getAttendanceRate(student.id);
                 return (
                   <div key={student.id} style={{ ...card, marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
-                    <Avatar name={student.name} size={44} />
+                    <SmallPhotoUploader
+                      userId={student.id}
+                      currentPhotoURL={student.photoURL}
+                      userName={student.name}
+                      collectionName="students"
+                      dark={dark}
+                      onUploadComplete={(url) => notify(`${student.name}'s photo updated! ✅`)}
+                    />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 15 }}>{student.name}</div>
                       <div style={{ fontSize: 12, color: textMuted }}>{student.studentId} · {student.course}</div>
@@ -658,32 +657,27 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
             </div>
           )}
 
-          {/* QR ATTENDANCE */}
-          {page === "qr" && (
-            <QRGenerator
-              user={user}
-              classes={classes}
-              students={students}
-              dark={dark}
-            />
-          )}
-
           {/* SETTINGS */}
           {page === "settings" && (
             <div>
               <div style={card}>
-                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>Account</h3>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderBottom: `1px solid ${border}` }}>
-                  <Avatar name={user.name} size={52} />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 17 }}>{user.name}</div>
-                    <div style={{ color: textMuted, fontSize: 13 }}>{user.email}</div>
-                    <span style={{ background: "#ede9fe", color: accent, borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>Teacher</span>
-                  </div>
+                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>👤 My Profile</h3>
+                <PhotoUploader
+                  userId={user.uid}
+                  currentPhotoURL={user.photoURL}
+                  userName={user.name}
+                  collection="users"
+                  dark={dark}
+                  onUploadComplete={(url) => notify("Profile photo updated! ✅")}
+                />
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${border}` }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{user.name}</div>
+                  <div style={{ color: textMuted, fontSize: 13 }}>{user.email}</div>
+                  <span style={{ background: "#ede9fe", color: accent, borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 700, marginTop: 4, display: "inline-block" }}>Teacher</span>
                 </div>
               </div>
               <div style={card}>
-                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>Appearance</h3>
+                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>🎨 Appearance</h3>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div><div style={{ fontWeight: 600 }}>Dark Mode</div><div style={{ fontSize: 12, color: textMuted }}>Toggle dark/light theme</div></div>
                   <button onClick={() => setDark(!dark)} style={{ width: 48, height: 26, borderRadius: 13, background: dark ? accent : surface2, border: `1px solid ${border}`, cursor: "pointer", position: "relative" }}>
@@ -692,7 +686,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                 </div>
               </div>
               <div style={card}>
-                <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700 }}>Firebase Status</h3>
+                <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700 }}>🔥 Firebase Status</h3>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 10, height: 10, borderRadius: "50%", background: COLORS.present }} />
                   <span style={{ fontSize: 14, color: textMuted }}>Connected to Firebase — edutrak-f6e7b</span>
