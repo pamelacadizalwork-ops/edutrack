@@ -51,8 +51,8 @@ export default function LoginPage({ dark, setDark }) {
         
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>
           <div style={{ width: 64, height: 64, background: accent, borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem", fontSize: 30 }}>🎓</div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: accent }}>EduTrack</h1>
-          <p style={{ margin: "4px 0 0", color: textMuted, fontSize: 14 }}>College Attendance Management System</p>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: accent }}>Ms. Cadizal's Class</h1>
+          <p style={{ margin: "4px 0 0", color: textMuted, fontSize: 14 }}>Attendance Management System</p>
         </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 20, background: dark ? "#0f172a" : "#f1f5f9", borderRadius: 12, padding: 4 }}>
