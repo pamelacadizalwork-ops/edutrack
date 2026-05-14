@@ -12,6 +12,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [dark, setDark] = useState(false);
 
+  // Check if arriving via QR scan link
+  const params = new URLSearchParams(window.location.search);
+  const qrSessionId = params.get("session");
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -39,10 +43,12 @@ export default function App() {
     </div>
   );
 
-  if (!user || !userProfile) return <LoginPage dark={dark} setDark={setDark} />;
+  // If student arrives via QR link but not logged in, show login first
+  // After login, StudentApp will auto-process the QR session
+  if (!user || !userProfile) return <LoginPage dark={dark} setDark={setDark} qrSessionId={qrSessionId} />;
 
   if (userProfile.role === "teacher") return <TeacherApp user={userProfile} onSignOut={handleSignOut} dark={dark} setDark={setDark} />;
-  if (userProfile.role === "student") return <StudentApp user={userProfile} onSignOut={handleSignOut} dark={dark} setDark={setDark} />;
+  if (userProfile.role === "student") return <StudentApp user={userProfile} onSignOut={handleSignOut} dark={dark} setDark={setDark} qrSessionId={qrSessionId} />;
 
   return <LoginPage dark={dark} setDark={setDark} />;
 }

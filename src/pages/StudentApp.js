@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/config";
+import QRScanner from "./QRScanner";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 
 const COLORS = {
@@ -32,13 +33,16 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function StudentApp({ user, onSignOut, dark, setDark }) {
-  const [page, setPage] = useState("attendance");
+export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId }) {
+  const [page, setPage] = useState(qrSessionId ? "qrscan" : "attendance");
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [studentInfo, setStudentInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [notification, setNotification] = useState(null);
+
+  const notify = (msg, type = "success") => { setNotification({ msg, type }); setTimeout(() => setNotification(null), 3000); };
 
   const accent = "#4f46e5";
   const bg = dark ? "#0f172a" : "#f8fafc";
@@ -103,6 +107,7 @@ export default function StudentApp({ user, onSignOut, dark, setDark }) {
 
   const navItems = [
     { id: "attendance", icon: "📋", label: "My Attendance" },
+    { id: "qrscan", icon: "📲", label: "Scan QR Code" },
     { id: "overview", icon: "📊", label: "Overview" },
     { id: "settings", icon: "⚙️", label: "Settings" },
   ];
@@ -112,6 +117,12 @@ export default function StudentApp({ user, onSignOut, dark, setDark }) {
 
   return (
     <div style={{ minHeight: "100vh", background: bg, display: "flex", fontFamily: "system-ui, sans-serif", color: text }}>
+
+      {notification && (
+        <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 20px", borderRadius: 12, background: notification.type === "error" ? "#fee2e2" : "#dcfce7", color: notification.type === "error" ? "#991b1b" : "#166534", fontWeight: 600, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
+          {notification.type === "error" ? "❌ " : "✅ "}{notification.msg}
+        </div>
+      )}
 
       {/* Sidebar */}
       <div style={{ width: sidebarOpen ? 240 : 64, background: surface, borderRight: `1px solid ${border}`, display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflow: "hidden" }}>
@@ -156,6 +167,11 @@ export default function StudentApp({ user, onSignOut, dark, setDark }) {
         </div>
 
         <div style={{ flex: 1, padding: "1.5rem", overflowY: "auto" }}>
+
+          {/* QR SCANNER PAGE */}
+          {page === "qrscan" && (
+            <QRScanner user={user} dark={dark} /> 
+          )}
 
           {/* MY ATTENDANCE PAGE */}
           {page === "attendance" && (

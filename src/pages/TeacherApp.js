@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/config";
+import QRGenerator from "./QRGenerator";
 import {
   collection, addDoc, getDocs, doc, setDoc, getDoc,
   query, where, orderBy, onSnapshot, deleteDoc, updateDoc, serverTimestamp
@@ -247,6 +248,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const navItems = [
     { id: "dashboard", icon: "📊", label: "Dashboard" },
     { id: "attendance", icon: "✅", label: "Take Attendance" },
+    { id: "qr", icon: "📱", label: "QR Attendance" },
     { id: "classes", icon: "📚", label: "My Classes" },
     { id: "students", icon: "👥", label: "Students" },
     { id: "reports", icon: "📄", label: "Reports" },
@@ -387,6 +389,17 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                 </>
               )}
             </div>
+          )}
+
+          {/* QR ATTENDANCE */}
+          {page === "qr" && (
+            <QRAttendancePage
+              user={user}
+              classes={classes}
+              students={students}
+              dark={dark}
+              notify={notify}
+            />
           )}
 
           {/* TAKE ATTENDANCE */}
@@ -643,6 +656,16 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* QR ATTENDANCE */}
+          {page === "qr" && (
+            <QRGenerator
+              user={user}
+              classes={classes}
+              students={students}
+              dark={dark}
+            />
           )}
 
           {/* SETTINGS */}
