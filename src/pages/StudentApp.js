@@ -3,6 +3,7 @@ import { db } from "../firebase/config";
 import QRScanner from "./QRScanner";
 import { Avatar, PhotoUploader } from "../components/PhotoUploader";
 import { SeenKaLogo, GradientButton, StatusBadge, SEENKA } from "../components/SeenKaTheme";
+import { decryptStudent, decryptAttendance } from "../utils/encryption";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
 const COLORS = {
@@ -32,27 +33,40 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
   const card = { background: "rgba(17,24,39,0.9)", border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 16, padding: "1.25rem", marginBottom: "1rem", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" };
 
   // Load attendance records for this student by matching name or studentId
+  // Load attendance by studentId (UID) — decrypt each record
   useEffect(() => {
-    // Try to find student record by email or name
     const q = query(
       collection(db, "attendance"),
-      where("studentName", "==", user.name)
+      where("studentId", "==", user.uid)
     );
     const unsub = onSnapshot(q, snap => {
-      const records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      records.sort((a, b) => b.date.localeCompare(a.date));
+      const records = snap.docs.map(d => {
+        const raw = { id: d.id, ...d.data() };
+        // Try to decrypt — teacherId is stored unencrypted so we can use it as key
+        try {
+          return decryptAttendance(raw, raw.teacherId || user.uid);
+        } catch {
+          return raw;
+        }
+      });
+      records.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
       setAttendanceRecords(records);
       setLoading(false);
     });
     return unsub;
-  }, [user.name]);
+  }, [user.uid]);
 
-  // Also try to find student profile info from students collection
+  // Load student profile info — decrypt fields
   useEffect(() => {
     const q = query(collection(db, "students"), where("email", "==", user.email));
     const unsub = onSnapshot(q, snap => {
       if (!snap.empty) {
-        setStudentInfo({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        const raw = { id: snap.docs[0].id, ...snap.docs[0].data() };
+        try {
+          setStudentInfo(decryptStudent(raw, raw.teacherId || user.uid));
+        } catch {
+          setStudentInfo(raw);
+        }
       }
     });
     return unsub;

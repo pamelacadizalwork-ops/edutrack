@@ -3,6 +3,7 @@ import { db } from "../firebase/config";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { QRCodeDisplay } from "../components/QRCode";
 import { GradientButton, SEENKA } from "../components/SeenKaTheme";
+import { encryptAttendance, generateSecureToken } from "../utils/encryption";
 
 export default function QRGenerator({ user, classes, students, dark }) {
   const [selectedClass, setSelectedClass] = useState(classes[0] || null);
@@ -99,7 +100,6 @@ export default function QRGenerator({ user, classes, students, dark }) {
     if (!qrSession) return;
     clearInterval(timerRef.current);
 
-    // Mark non-scanned students as absent
     const classStudents = students.filter(s => s.section === selectedClass.section);
     const todayStr = new Date().toISOString().split("T")[0];
 
@@ -107,7 +107,7 @@ export default function QRGenerator({ user, classes, students, dark }) {
       const alreadyScanned = scannedStudents.find(s => s.studentId === student.id);
       if (!alreadyScanned) {
         const docId = `${selectedClass.id}_${student.id}_${todayStr}`;
-        await setDoc(doc(db, "attendance", docId), {
+        const record = {
           classId: selectedClass.id,
           className: selectedClass.name,
           studentId: student.id,
@@ -118,13 +118,16 @@ export default function QRGenerator({ user, classes, students, dark }) {
           teacherId: user.uid,
           updatedAt: serverTimestamp(),
           markedByQR: false,
-        });
+          _encrypted: true,
+        };
+        const encrypted = encryptAttendance(record, user.uid);
+        await setDoc(doc(db, "attendance", docId), encrypted);
       }
     });
     await Promise.all(promises);
     setQrSession(null);
     setScannedStudents([]);
-    alert("Attendance saved! Present students recorded, absent students marked.");
+    alert("🔐 Attendance encrypted & saved! Present students recorded, absent students marked.");
   };
 
   const copyLink = () => {

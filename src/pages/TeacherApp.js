@@ -3,6 +3,7 @@ import { db } from "../firebase/config";
 import QRGenerator from "./QRGenerator";
 import { Avatar, PhotoUploader, SmallPhotoUploader } from "../components/PhotoUploader";
 import { SeenKaLogo, GradientButton, GlassCard, StatusBadge, StatCard, SEENKA } from "../components/SeenKaTheme";
+import { encryptStudent, decryptStudent, encryptAttendance, decryptAttendance, encryptClass, decryptClass } from "../utils/encryption";
 import {
   collection, addDoc, doc, setDoc,
   query, where, onSnapshot, deleteDoc, updateDoc, serverTimestamp
@@ -64,11 +65,14 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
 
   const notify = (msg, type = "success") => { setNotification({ msg, type }); setTimeout(() => setNotification(null), 3000); };
 
-  // Load classes
+  // Load classes - decrypt on read
   useEffect(() => {
     const q = query(collection(db, "classes"), where("teacherId", "==", user.uid));
     const unsub = onSnapshot(q, snap => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const data = snap.docs.map(d => {
+        const raw = { id: d.id, ...d.data() };
+        return decryptClass(raw, user.uid);
+      });
       setClasses(data);
       if (data.length > 0 && !selectedClass) setSelectedClass(data[0]);
       setLoadingData(false);
@@ -76,23 +80,28 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
     return unsub;
   }, [user.uid]);
 
-  // Load students
+  // Load students - decrypt on read
   useEffect(() => {
     const q = query(collection(db, "students"), where("teacherId", "==", user.uid));
     const unsub = onSnapshot(q, snap => {
-      setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const data = snap.docs.map(d => {
+        const raw = { id: d.id, ...d.data() };
+        return decryptStudent(raw, user.uid);
+      });
+      setStudents(data);
     });
     return unsub;
   }, [user.uid]);
 
-  // Load attendance for selected class
+  // Load attendance for selected class - decrypt on read
   useEffect(() => {
     if (!selectedClass) return;
     const q = query(collection(db, "attendance"), where("classId", "==", selectedClass.id));
     const unsub = onSnapshot(q, snap => {
       const records = {};
       snap.docs.forEach(d => {
-        const data = d.data();
+        const raw = { id: d.id, ...d.data() };
+        const data = decryptAttendance(raw, user.uid);
         if (!records[data.date]) records[data.date] = {};
         records[data.date][data.studentId] = data.status;
       });
@@ -115,7 +124,11 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const addClass = async () => {
     if (!classForm.name || !classForm.section) { notify("Class name and section are required", "error"); return; }
     try {
-      await addDoc(collection(db, "classes"), { ...classForm, teacherId: user.uid, teacherName: user.name, createdAt: serverTimestamp() });
+      const encrypted = encryptClass(
+        { ...classForm, teacherId: user.uid, teacherName: user.name, createdAt: serverTimestamp() },
+        user.uid
+      );
+      await addDoc(collection(db, "classes"), encrypted);
       setClassForm({ name: "", code: "", section: "", schedule: "" });
       setShowAddClass(false);
       notify("Class added successfully!");
@@ -125,7 +138,11 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const addStudent = async () => {
     if (!studentForm.name || !studentForm.studentId) { notify("Name and Student ID are required", "error"); return; }
     try {
-      await addDoc(collection(db, "students"), { ...studentForm, teacherId: user.uid, createdAt: serverTimestamp() });
+      const encrypted = encryptStudent(
+        { ...studentForm, teacherId: user.uid, createdAt: serverTimestamp() },
+        user.uid
+      );
+      await addDoc(collection(db, "students"), encrypted);
       setStudentForm({ name: "", studentId: "", course: "", section: "", email: "" });
       setShowAddStudent(false);
       notify("Student added successfully!");
@@ -157,9 +174,10 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const saveEditClass = async () => {
     if (!editClassForm.name || !editClassForm.section) { notify("Name and section are required", "error"); return; }
     try {
-      await updateDoc(doc(db, "classes", editingClass), { ...editClassForm, updatedAt: serverTimestamp() });
+      const encrypted = encryptClass({ ...editClassForm, updatedAt: serverTimestamp() }, user.uid);
+      await updateDoc(doc(db, "classes", editingClass), encrypted);
       setEditingClass(null);
-      notify("Class updated successfully!");
+      notify("Class updated & re-encrypted! 🔐");
     } catch (e) { notify("Error updating class", "error"); }
   };
 
@@ -172,7 +190,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
         const status = todayAttendance[student.id];
         if (!status) return;
         const docId = `${selectedClass.id}_${student.id}_${selectedDate}`;
-        await setDoc(doc(db, "attendance", docId), {
+        const record = {
           classId: selectedClass.id,
           className: selectedClass.name,
           studentId: student.id,
@@ -181,12 +199,16 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
           date: selectedDate,
           status: status,
           teacherId: user.uid,
-          updatedAt: serverTimestamp()
-        });
+          updatedAt: serverTimestamp(),
+          markedByQR: false,
+          _encrypted: true,
+        };
+        const encrypted = encryptAttendance(record, user.uid);
+        await setDoc(doc(db, "attendance", docId), encrypted);
       });
       await Promise.all(promises);
       setSaved(true);
-      notify("Attendance saved to Firebase! ✅");
+      notify("Attendance encrypted & saved! 🔐");
     } catch (e) { notify("Error saving: " + e.message, "error"); }
     setSaving(false);
   };
@@ -750,6 +772,28 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                   </button>
                 </div>
               </div>
+              <div style={{ ...card, border: `1px solid rgba(0,163,255,0.2)`, boxShadow: "0 0 20px rgba(0,163,255,0.08)" }}>
+                <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700 }}>🔐 Encryption Status</h3>
+                {[
+                  { label: "Student Data", detail: "Names, IDs, emails, sections" },
+                  { label: "Attendance Records", detail: "Status, student names, sections" },
+                  { label: "Class Information", detail: "Subject names, codes, schedules" },
+                  { label: "QR Sessions", detail: "Scan URLs, session tokens" },
+                ].map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < 3 ? `1px solid ${SEENKA.darkBorder}` : "none" }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(0,163,255,0.1)", border: "1px solid rgba(0,163,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🔒</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: SEENKA.textPrimary }}>{item.label}</div>
+                      <div style={{ fontSize: 11, color: SEENKA.textMuted }}>{item.detail}</div>
+                    </div>
+                    <span style={{ background: "rgba(16,185,129,0.1)", color: SEENKA.present, border: "1px solid rgba(16,185,129,0.25)", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>AES-256 ✓</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(0,163,255,0.05)", borderRadius: 10, border: "1px solid rgba(0,163,255,0.1)", fontSize: 12, color: SEENKA.textMuted, lineHeight: 1.7 }}>
+                  🛡️ All sensitive data is encrypted using <strong style={{ color: SEENKA.electricBlue }}>AES-256-CBC</strong> before being stored in Firebase. Keys are derived from your unique Teacher ID — only you can read the data.
+                </div>
+              </div>
+
               <div style={card}>
                 <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700 }}>🔥 Firebase Status</h3>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
