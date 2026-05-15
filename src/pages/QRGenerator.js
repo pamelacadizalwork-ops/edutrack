@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { db } from "../firebase/config";
-import { doc, setDoc, onSnapshot, serverTimestamp, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { QRCodeDisplay } from "../components/QRCode";
 
 export default function QRGenerator({ user, classes, students, dark }) {
   const [selectedClass, setSelectedClass] = useState(classes[0] || null);
@@ -9,7 +10,6 @@ export default function QRGenerator({ user, classes, students, dark }) {
   const [scannedStudents, setScannedStudents] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [expiryMinutes, setExpiryMinutes] = useState(15);
-  const [qrImageUrl, setQrImageUrl] = useState("");
   const timerRef = useRef(null);
 
   const accent = "#4f46e5";
@@ -49,7 +49,6 @@ export default function QRGenerator({ user, classes, students, dark }) {
       if (remaining === 0) {
         clearInterval(timerRef.current);
         setQrSession(null);
-        setQrImageUrl("");
       }
     }, 1000);
     return () => clearInterval(timerRef.current);
@@ -85,8 +84,6 @@ export default function QRGenerator({ user, classes, students, dark }) {
 
       // Generate QR image using Google Charts API (no library needed)
       const encodedUrl = encodeURIComponent(scanUrl);
-      const qrUrl = `https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=${encodedUrl}&choe=UTF-8`;
-      setQrImageUrl(qrUrl);
 
       setQrSession({ ...sessionData, expiresAt });
       setTimeLeft(expiryMinutes * 60);
@@ -125,7 +122,6 @@ export default function QRGenerator({ user, classes, students, dark }) {
     });
     await Promise.all(promises);
     setQrSession(null);
-    setQrImageUrl("");
     setScannedStudents([]);
     alert("Attendance saved! Present students recorded, absent students marked.");
   };
@@ -221,12 +217,12 @@ export default function QRGenerator({ user, classes, students, dark }) {
               <div style={{ fontSize: 13, color: textMuted }}>Section {selectedClass?.section} · {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
             </div>
 
-            {/* QR Image */}
+            {/* QR Code */}
             <div style={{ display: "inline-block", padding: 16, background: "#fff", borderRadius: 16, marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}>
-              {qrImageUrl ? (
-                <img src={qrImageUrl} alt="QR Code" width={220} height={220} style={{ display: "block" }} />
+              {qrSession?.scanUrl ? (
+                <QRCodeDisplay value={qrSession.scanUrl} size={220} />
               ) : (
-                <div style={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8" }}>Loading QR...</div>
+                <div style={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 13 }}>Generating...</div>
               )}
             </div>
 
