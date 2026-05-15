@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { db } from "../firebase/config";
 import QRScanner from "./QRScanner";
 import { Avatar, PhotoUploader } from "../components/PhotoUploader";
+import { SeenKaLogo, GradientButton, StatusBadge, SEENKA } from "../components/SeenKaTheme";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
 const COLORS = {
@@ -9,21 +10,6 @@ const COLORS = {
   presentBg: "#dcfce7", lateBg: "#fef3c7", absentBg: "#fee2e2", excusedBg: "#dbeafe",
 };
 
-
-function StatusBadge({ status }) {
-  const cfg = {
-    present: { bg: COLORS.presentBg, color: "#166534", label: "Present" },
-    late: { bg: COLORS.lateBg, color: "#92400e", label: "Late" },
-    absent: { bg: COLORS.absentBg, color: "#991b1b", label: "Absent" },
-    excused: { bg: COLORS.excusedBg, color: "#1e40af", label: "Excused" },
-  };
-  const c = cfg[status] || { bg: "#f3f4f6", color: "#6b7280", label: "Not Marked" };
-  return (
-    <span style={{ background: c.bg, color: c.color, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700 }}>
-      {c.label}
-    </span>
-  );
-}
 
 export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId }) {
   const [page, setPage] = useState(qrSessionId ? "qrscan" : "attendance");
@@ -36,14 +22,14 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
 
   const notify = (msg, type = "success") => { setNotification({ msg, type }); setTimeout(() => setNotification(null), 3000); };
 
-  const accent = "#4f46e5";
-  const bg = dark ? "#0f172a" : "#f8fafc";
-  const surface = dark ? "#1e293b" : "#ffffff";
-  const surface2 = dark ? "#334155" : "#f1f5f9";
-  const border = dark ? "#334155" : "#e2e8f0";
-  const text = dark ? "#f1f5f9" : "#0f172a";
-  const textMuted = dark ? "#94a3b8" : "#64748b";
-  const card = { background: surface, border: `1px solid ${border}`, borderRadius: 16, padding: "1.25rem", marginBottom: "1rem" };
+  const accent = SEENKA.electricBlue;
+  const bg = SEENKA.darkNav;
+  const surface = SEENKA.darkCard;
+  const surface2 = SEENKA.darkCardElevated;
+  const border = SEENKA.darkBorder;
+  const text = SEENKA.textPrimary;
+  const textMuted = SEENKA.textMuted;
+  const card = { background: "rgba(17,24,39,0.9)", border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 16, padding: "1.25rem", marginBottom: "1rem", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" };
 
   // Load attendance records for this student by matching name or studentId
   useEffect(() => {
@@ -108,7 +94,7 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
   const months = [...new Set(attendanceRecords.map(r => r.date?.slice(0, 7)))].sort().reverse();
 
   return (
-    <div style={{ minHeight: "100vh", background: bg, display: "flex", fontFamily: "system-ui, sans-serif", color: text }}>
+    <div style={{ minHeight: "100vh", background: SEENKA.darkNav, display: "flex", fontFamily: "system-ui, sans-serif", color: SEENKA.textPrimary }}>
 
       {notification && (
         <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 20px", borderRadius: 12, background: notification.type === "error" ? "#fee2e2" : "#dcfce7", color: notification.type === "error" ? "#991b1b" : "#166534", fontWeight: 600, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
@@ -116,40 +102,48 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
         </div>
       )}
 
-      {/* Mobile overlay backdrop */}
+      {/* Mobile overlay */}
       {sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 40 }} />
+        <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40, backdropFilter: "blur(2px)" }} />
       )}
 
-      {/* Sidebar - overlay on all screen sizes */}
+      {/* Sidebar */}
       <div style={{
         position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 50,
-        width: 240, background: surface, borderRight: `1px solid ${border}`,
+        width: 240, background: "rgba(10,15,30,0.98)",
+        borderRight: `1px solid ${SEENKA.darkBorder}`,
         display: "flex", flexDirection: "column",
         transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-        transition: "transform 0.25s ease", boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.15)" : "none"
+        transition: "transform 0.25s ease",
+        boxShadow: sidebarOpen ? "4px 0 40px rgba(0,0,0,0.6)" : "none"
       }}>
-        <div style={{ padding: "1.25rem 1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, background: accent, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🎓</div>
-            <span style={{ fontWeight: 800, fontSize: 17, color: accent }}>EduTrack</span>
-          </div>
-          <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: textMuted, padding: "4px" }}>✕</button>
+        <div style={{ padding: "1.25rem 1rem", borderBottom: `1px solid ${SEENKA.darkBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <SeenKaLogo size={32} showText={true} textSize={18} />
+          <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: SEENKA.textMuted }}>✕</button>
         </div>
         <nav style={{ flex: 1, padding: "1rem 0.5rem" }}>
           {navItems.map(item => (
-            <button key={item.id} onClick={() => { setPage(item.id); setSidebarOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, border: "none", background: page === item.id ? "#ede9fe" : "none", color: page === item.id ? accent : textMuted, cursor: "pointer", fontWeight: page === item.id ? 700 : 500, fontSize: 14, marginBottom: 2, textAlign: "left" }}>
+            <button key={item.id} onClick={() => { setPage(item.id); setSidebarOpen(false); }} style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "11px 14px", borderRadius: 10, border: "none",
+              background: page === item.id ? "linear-gradient(135deg, rgba(0,163,255,0.15), rgba(168,85,247,0.15))" : "none",
+              color: page === item.id ? SEENKA.electricBlue : SEENKA.textMuted,
+              cursor: "pointer", fontWeight: page === item.id ? 700 : 500,
+              fontSize: 14, marginBottom: 2, textAlign: "left",
+              borderLeft: page === item.id ? `3px solid ${SEENKA.electricBlue}` : "3px solid transparent",
+              transition: "all 0.15s"
+            }}>
               <span style={{ fontSize: 18 }}>{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
-        <div style={{ padding: "1rem 0.75rem", borderTop: `1px solid ${border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <div style={{ padding: "1rem 0.75rem", borderTop: `1px solid ${SEENKA.darkBorder}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "8px 10px", background: "rgba(0,163,255,0.06)", borderRadius: 10, border: `1px solid ${SEENKA.darkBorder}` }}>
             <Avatar name={user.name} size={32} photoURL={user.photoURL} />
-            <div><div style={{ fontSize: 13, fontWeight: 700 }}>{user.name}</div><div style={{ fontSize: 11, color: textMuted }}>Student</div></div>
+            <div><div style={{ fontSize: 12, fontWeight: 700, color: SEENKA.textPrimary }}>{user.name}</div><div style={{ fontSize: 10, color: SEENKA.textMuted }}>Student</div></div>
           </div>
-          <button onClick={onSignOut} style={{ background: surface2, color: text, border: `1px solid ${border}`, borderRadius: 9, padding: "8px", cursor: "pointer", fontWeight: 500, fontSize: 12, width: "100%" }}>
+          <button onClick={onSignOut} style={{ background: "rgba(255,255,255,0.05)", color: SEENKA.textPrimary, border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 9, padding: "8px", cursor: "pointer", fontWeight: 500, fontSize: 12, width: "100%" }}>
             🚪 Sign Out
           </button>
         </div>
@@ -158,13 +152,14 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
       {/* Main */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, width: "100%" }}>
         {/* Topbar */}
-        <div style={{ background: surface, borderBottom: `1px solid ${border}`, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
-          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 11px", cursor: "pointer", fontSize: 16, color: text, flexShrink: 0 }}>☰</button>
+        <div style={{ background: "rgba(10,15,30,0.95)", backdropFilter: "blur(12px)", borderBottom: `1px solid ${SEENKA.darkBorder}`, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
+          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "rgba(0,163,255,0.08)", border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 8, padding: "8px 11px", cursor: "pointer", fontSize: 16, color: SEENKA.electricBlue, flexShrink: 0 }}>☰</button>
+          <SeenKaLogo size={24} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{navItems.find(n => n.id === page)?.label}</h2>
-            <p style={{ margin: 0, fontSize: 11, color: textMuted }}>{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: SEENKA.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{navItems.find(n => n.id === page)?.label}</h2>
+            <p style={{ margin: 0, fontSize: 11, color: SEENKA.textMuted }}>{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>
           </div>
-          <button onClick={() => setDark(!dark)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{dark ? "☀️" : "🌙"}</button>
+          <button onClick={() => setDark(!dark)} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{dark ? "☀️" : "🌙"}</button>
         </div>
 
         <div style={{ flex: 1, padding: "1rem", overflowY: "auto" }}>
@@ -178,7 +173,7 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
           {page === "attendance" && (
             <div>
               {/* Profile Card */}
-              <div style={{ ...card, background: `linear-gradient(135deg, ${accent}, #7c3aed)`, color: "#fff", display: "flex", gap: 16, alignItems: "center", marginBottom: "1.5rem" }}>
+              <div style={{ ...card, background: `linear-gradient(135deg, rgba(0,163,255,0.15), rgba(168,85,247,0.15))`, border: `1px solid rgba(0,163,255,0.25)`, display: "flex", gap: 16, alignItems: "center", marginBottom: "1.5rem", boxShadow: "0 0 30px rgba(0,163,255,0.1)" }}>
                 <Avatar name={user.name} size={60} style={{ background: "rgba(255,255,255,0.25)", fontSize: 22 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, fontSize: 20 }}>{user.name}</div>
@@ -198,11 +193,11 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
 
               {/* Warning banner */}
               {attendanceRate < 75 && stats.total > 0 && (
-                <div style={{ background: "#fee2e2", border: "1.5px solid #fca5a5", borderRadius: 12, padding: "14px 18px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ background: "rgba(239,68,68,0.1)", border: "1.5px solid rgba(239,68,68,0.3)", borderRadius: 12, padding: "14px 18px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 0 20px rgba(239,68,68,0.1)" }}>
                   <span style={{ fontSize: 24 }}>⚠️</span>
                   <div>
-                    <div style={{ fontWeight: 700, color: "#991b1b", fontSize: 15 }}>Attendance Warning!</div>
-                    <div style={{ color: "#b91c1c", fontSize: 13 }}>Your attendance is below 75%. You are at risk of being barred from examinations. Please coordinate with your instructor.</div>
+                    <div style={{ fontWeight: 700, color: "#EF4444", fontSize: 15 }}>Attendance Warning!</div>
+                    <div style={{ color: "#FCA5A5", fontSize: 13 }}>Your attendance is below 75%. You are at risk of being barred from examinations.</div>
                   </div>
                 </div>
               )}
@@ -210,14 +205,14 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
               {/* Stats */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: "1.5rem" }}>
                 {[
-                  { label: "Present", value: stats.present, color: COLORS.present, bg: COLORS.presentBg },
-                  { label: "Late", value: stats.late, color: "#92400e", bg: COLORS.lateBg },
-                  { label: "Absent", value: stats.absent, color: "#991b1b", bg: COLORS.absentBg },
-                  { label: "Excused", value: stats.excused, color: "#1e40af", bg: COLORS.excusedBg },
+                  { label: "Present", value: stats.present, color: SEENKA.present, bg: "rgba(16,185,129,0.1)", border: "rgba(16,185,129,0.2)" },
+                  { label: "Late", value: stats.late, color: SEENKA.late, bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.2)" },
+                  { label: "Absent", value: stats.absent, color: SEENKA.absent, bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.2)" },
+                  { label: "Excused", value: stats.excused, color: SEENKA.excused, bg: "rgba(0,163,255,0.1)", border: "rgba(0,163,255,0.2)" },
                 ].map((s, i) => (
-                  <div key={i} style={{ background: s.bg, borderRadius: 12, padding: "1rem", textAlign: "center" }}>
+                  <div key={i} style={{ background: s.bg, borderRadius: 12, padding: "1rem", textAlign: "center", border: `1px solid ${s.border}`, boxShadow: `0 0 12px ${s.border}` }}>
                     <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
-                    <div style={{ fontSize: 12, color: s.color, fontWeight: 600 }}>{s.label}</div>
+                    <div style={{ fontSize: 12, color: s.color, fontWeight: 600, opacity: 0.8 }}>{s.label}</div>
                   </div>
                 ))}
               </div>

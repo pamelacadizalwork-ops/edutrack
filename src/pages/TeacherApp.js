@@ -2,29 +2,23 @@ import { useState, useEffect } from "react";
 import { db } from "../firebase/config";
 import QRGenerator from "./QRGenerator";
 import { Avatar, PhotoUploader, SmallPhotoUploader } from "../components/PhotoUploader";
+import { SeenKaLogo, GradientButton, GlassCard, StatusBadge, StatCard, SEENKA } from "../components/SeenKaTheme";
 import {
-  collection, addDoc, getDocs, doc, setDoc, getDoc,
-  query, where, orderBy, onSnapshot, deleteDoc, updateDoc, serverTimestamp
+  collection, addDoc, doc, setDoc,
+  query, where, onSnapshot, deleteDoc, updateDoc, serverTimestamp
 } from "firebase/firestore";
 
 const COLORS = {
-  present: "#22c55e", late: "#f59e0b", absent: "#ef4444", excused: "#3b82f6",
-  presentBg: "#dcfce7", lateBg: "#fef3c7", absentBg: "#fee2e2", excusedBg: "#dbeafe",
+  present: SEENKA.present, late: SEENKA.late, absent: SEENKA.absent, excused: SEENKA.excused,
+  presentBg: SEENKA.presentBg, lateBg: SEENKA.lateBg, absentBg: SEENKA.absentBg, excusedBg: SEENKA.excusedBg,
 };
-
-
-function StatusBadge({ status }) {
-  const cfg = { present: { bg: COLORS.presentBg, color: "#166534", label: "Present" }, late: { bg: COLORS.lateBg, color: "#92400e", label: "Late" }, absent: { bg: COLORS.absentBg, color: "#991b1b", label: "Absent" }, excused: { bg: COLORS.excusedBg, color: "#1e40af", label: "Excused" } };
-  const c = cfg[status] || { bg: "#f3f4f6", color: "#6b7280", label: "—" };
-  return <span style={{ background: c.bg, color: c.color, borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>{c.label}</span>;
-}
 
 function MiniBarChart({ data }) {
   const max = Math.max(...data.map(d => d.value), 1);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 56 }}>
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 56 }}>
       {data.map((d, i) => (
-        <div key={i} title={`${d.label}: ${d.value}%`} style={{ flex: 1, background: d.color || "#4f46e5", borderRadius: "3px 3px 0 0", height: `${(d.value / max) * 100}%`, minHeight: 4, opacity: 0.85 }} />
+        <div key={i} title={`${d.label}: ${d.value}%`} style={{ flex: 1, background: d.color || SEENKA.electricBlue, borderRadius: "4px 4px 0 0", height: `${(d.value / max) * 100}%`, minHeight: 4, opacity: 0.85, boxShadow: `0 0 8px ${d.color || SEENKA.electricBlue}50` }} />
       ))}
     </div>
   );
@@ -56,17 +50,17 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const [editClassForm, setEditClassForm] = useState({ name: "", code: "", section: "", schedule: "" });
 
   const todayStr = new Date().toISOString().split("T")[0];
-  const accent = "#4f46e5";
-  const bg = dark ? "#0f172a" : "#f8fafc";
-  const surface = dark ? "#1e293b" : "#ffffff";
-  const surface2 = dark ? "#334155" : "#f1f5f9";
-  const border = dark ? "#334155" : "#e2e8f0";
-  const text = dark ? "#f1f5f9" : "#0f172a";
-  const textMuted = dark ? "#94a3b8" : "#64748b";
-  const card = { background: surface, border: `1px solid ${border}`, borderRadius: 16, padding: "1.25rem", marginBottom: "1rem" };
-  const inputStyle = { width: "100%", padding: "9px 13px", borderRadius: 9, border: `1.5px solid ${border}`, background: dark ? "#0f172a" : "#f8fafc", color: text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "system-ui" };
-  const btnPrimary = { background: accent, color: "#fff", border: "none", borderRadius: 9, padding: "9px 18px", cursor: "pointer", fontWeight: 700, fontSize: 13 };
-  const btnSecondary = { background: surface2, color: text, border: `1px solid ${border}`, borderRadius: 9, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13 };
+  const accent = SEENKA.electricBlue;
+  const bg = SEENKA.darkNav;
+  const surface = SEENKA.darkCard;
+  const surface2 = SEENKA.darkCardElevated;
+  const border = SEENKA.darkBorder;
+  const text = SEENKA.textPrimary;
+  const textMuted = SEENKA.textMuted;
+  const card = { background: "rgba(17,24,39,0.9)", border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 16, padding: "1.25rem", marginBottom: "1rem", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" };
+  const inputStyle = { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${SEENKA.darkBorder}`, background: "rgba(255,255,255,0.04)", color: text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "system-ui" };
+  const btnPrimary = { background: SEENKA.gradientPrimary, color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", cursor: "pointer", fontWeight: 700, fontSize: 13, boxShadow: "0 4px 14px rgba(0,163,255,0.3)" };
+  const btnSecondary = { background: "rgba(255,255,255,0.05)", color: text, border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13 };
 
   const notify = (msg, type = "success") => { setNotification({ msg, type }); setTimeout(() => setNotification(null), 3000); };
 
@@ -273,48 +267,57 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: bg, display: "flex", fontFamily: "system-ui, sans-serif", color: text }}>
+    <div style={{ minHeight: "100vh", background: SEENKA.darkNav, display: "flex", fontFamily: "system-ui, sans-serif", color: SEENKA.textPrimary }}>
       {notification && (
-        <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 20px", borderRadius: 12, background: notification.type === "error" ? "#fee2e2" : "#dcfce7", color: notification.type === "error" ? "#991b1b" : "#166534", fontWeight: 600, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
+        <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 20px", borderRadius: 12, background: notification.type === "error" ? "rgba(239,68,68,0.15)" : "rgba(16,185,129,0.15)", color: notification.type === "error" ? "#EF4444" : "#10B981", fontWeight: 600, fontSize: 14, boxShadow: notification.type === "error" ? "0 0 20px rgba(239,68,68,0.2)" : "0 0 20px rgba(16,185,129,0.2)", border: `1px solid ${notification.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.3)"}`, backdropFilter: "blur(10px)" }}>
           {notification.type === "error" ? "❌ " : "✅ "}{notification.msg}
         </div>
       )}
 
       {/* Mobile overlay backdrop */}
       {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 40 }}
-        />
+        <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40, backdropFilter: "blur(2px)" }} />
       )}
 
-      {/* Sidebar - slides in as overlay on all screen sizes */}
+      {/* Sidebar */}
       <div style={{
         position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 50,
-        width: 240, background: surface, borderRight: `1px solid ${border}`,
+        width: 240, background: "rgba(10,15,30,0.98)",
+        borderRight: `1px solid ${SEENKA.darkBorder}`,
         display: "flex", flexDirection: "column",
         transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-        transition: "transform 0.25s ease", boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.15)" : "none"
+        transition: "transform 0.25s ease",
+        boxShadow: sidebarOpen ? `4px 0 40px rgba(0,0,0,0.6), 0 0 60px rgba(0,163,255,0.05)` : "none"
       }}>
-        <div style={{ padding: "1.25rem 1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, background: accent, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🎓</div>
-            <span style={{ fontWeight: 800, fontSize: 17, color: accent }}>EduTrack</span>
-          </div>
-          <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: textMuted, padding: "4px" }}>✕</button>
+        {/* Logo */}
+        <div style={{ padding: "1.25rem 1rem", borderBottom: `1px solid ${SEENKA.darkBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <SeenKaLogo size={32} showText={true} textSize={18} />
+          <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: SEENKA.textMuted, padding: "4px" }}>✕</button>
         </div>
+        {/* Nav */}
         <nav style={{ flex: 1, padding: "1rem 0.5rem", overflowY: "auto" }}>
           {navItems.map(item => (
-            <button key={item.id} onClick={() => { setPage(item.id); setSidebarOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, border: "none", background: page === item.id ? "#ede9fe" : "none", color: page === item.id ? accent : textMuted, cursor: "pointer", fontWeight: page === item.id ? 700 : 500, fontSize: 14, marginBottom: 2, textAlign: "left" }}>
-              <span style={{ fontSize: 18 }}>{item.icon}</span>
+            <button key={item.id} onClick={() => { setPage(item.id); setSidebarOpen(false); }} style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "11px 14px", borderRadius: 10, border: "none",
+              background: page === item.id ? "linear-gradient(135deg, rgba(0,163,255,0.15), rgba(168,85,247,0.15))" : "none",
+              color: page === item.id ? SEENKA.electricBlue : SEENKA.textMuted,
+              cursor: "pointer", fontWeight: page === item.id ? 700 : 500,
+              fontSize: 14, marginBottom: 2, textAlign: "left",
+              borderLeft: page === item.id ? `3px solid ${SEENKA.electricBlue}` : "3px solid transparent",
+              boxShadow: page === item.id ? "0 0 16px rgba(0,163,255,0.08)" : "none",
+              transition: "all 0.15s"
+            }}>
+              <span style={{ fontSize: 17 }}>{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
-        <div style={{ padding: "1rem 0.75rem", borderTop: `1px solid ${border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        {/* User */}
+        <div style={{ padding: "1rem 0.75rem", borderTop: `1px solid ${SEENKA.darkBorder}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "8px 10px", background: "rgba(0,163,255,0.06)", borderRadius: 10, border: `1px solid ${SEENKA.darkBorder}` }}>
             <Avatar name={user.name} size={32} photoURL={user.photoURL} />
-            <div><div style={{ fontSize: 13, fontWeight: 700 }}>{user.name}</div><div style={{ fontSize: 11, color: textMuted }}>Teacher</div></div>
+            <div><div style={{ fontSize: 12, fontWeight: 700, color: SEENKA.textPrimary }}>{user.name}</div><div style={{ fontSize: 10, color: SEENKA.textMuted }}>Teacher</div></div>
           </div>
           <button onClick={onSignOut} style={{ ...btnSecondary, width: "100%", fontSize: 12 }}>🚪 Sign Out</button>
         </div>
@@ -323,13 +326,14 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
       {/* Main Content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, width: "100%" }}>
         {/* Topbar */}
-        <div style={{ background: surface, borderBottom: `1px solid ${border}`, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
-          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 11px", cursor: "pointer", fontSize: 16, color: text, flexShrink: 0 }}>☰</button>
+        <div style={{ background: "rgba(10,15,30,0.95)", backdropFilter: "blur(12px)", borderBottom: `1px solid ${SEENKA.darkBorder}`, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
+          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "rgba(0,163,255,0.08)", border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 8, padding: "8px 11px", cursor: "pointer", fontSize: 16, color: SEENKA.electricBlue, flexShrink: 0, boxShadow: "0 0 12px rgba(0,163,255,0.1)" }}>☰</button>
+          <SeenKaLogo size={24} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{navItems.find(n => n.id === page)?.label}</h2>
-            <p style={{ margin: 0, fontSize: 11, color: textMuted }}>{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: SEENKA.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{navItems.find(n => n.id === page)?.label}</h2>
+            <p style={{ margin: 0, fontSize: 11, color: SEENKA.textMuted }}>{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>
           </div>
-          <button onClick={() => setDark(!dark)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{dark ? "☀️" : "🌙"}</button>
+          <button onClick={() => setDark(!dark)} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{dark ? "☀️" : "🌙"}</button>
         </div>
 
         <div style={{ flex: 1, padding: "1rem", overflowY: "auto" }}>
@@ -350,17 +354,13 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: "1.5rem" }}>
                     {[
-                      { label: "Total Students", value: students.length, icon: "👥", color: accent },
-                      { label: "Total Classes", value: classes.length, icon: "📚", color: "#0891b2" },
-                      { label: "Present Today", value: Object.values(attendanceRecords[todayStr] || {}).filter(v => v === "present").length, icon: "✅", color: COLORS.present },
-                      { label: "Absent Today", value: Object.values(attendanceRecords[todayStr] || {}).filter(v => v === "absent").length, icon: "❌", color: COLORS.absent },
-                      { label: "Avg Rate", value: overallStats.rate + "%", icon: "📈", color: "#7c3aed" },
+                      { label: "Total Students", value: students.length, icon: "👥", color: SEENKA.electricBlue },
+                      { label: "Total Classes", value: classes.length, icon: "📚", color: SEENKA.cyan },
+                      { label: "Present Today", value: Object.values(attendanceRecords[todayStr] || {}).filter(v => v === "present").length, icon: "✅", color: SEENKA.present },
+                      { label: "Absent Today", value: Object.values(attendanceRecords[todayStr] || {}).filter(v => v === "absent").length, icon: "❌", color: SEENKA.absent },
+                      { label: "Avg Rate", value: overallStats.rate + "%", icon: "📈", color: SEENKA.neonPurple },
                     ].map((stat, i) => (
-                      <div key={i} style={{ background: surface, border: `1px solid ${border}`, borderRadius: 16, padding: "1.25rem" }}>
-                        <span style={{ fontSize: 22 }}>{stat.icon}</span>
-                        <div style={{ fontSize: 26, fontWeight: 800, color: stat.color, marginTop: 4 }}>{stat.value}</div>
-                        <div style={{ fontSize: 12, color: textMuted }}>{stat.label}</div>
-                      </div>
+                      <StatCard key={i} icon={stat.icon} label={stat.label} value={stat.value} color={stat.color} glow={true} />
                     ))}
                   </div>
 
@@ -375,10 +375,10 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                     <div style={card}>
                       <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700 }}>Status Breakdown</h3>
                       {[
-                        { label: "Present", val: overallStats.present, color: COLORS.present },
-                        { label: "Late", val: overallStats.late, color: COLORS.late },
-                        { label: "Absent", val: overallStats.absent, color: COLORS.absent },
-                        { label: "Excused", val: overallStats.excused, color: COLORS.excused },
+                        { label: "Present", val: overallStats.present, color: SEENKA.present },
+                        { label: "Late", val: overallStats.late, color: SEENKA.late },
+                        { label: "Absent", val: overallStats.absent, color: SEENKA.absent },
+                        { label: "Excused", val: overallStats.excused, color: SEENKA.excused },
                       ].map((s, i) => (
                         <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                           <div style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
@@ -392,14 +392,14 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                     </div>
                   </div>
 
-                  <div style={card}>
+                  <div style={{ ...card, border: `1px solid rgba(0,163,255,0.2)`, boxShadow: "0 0 30px rgba(0,163,255,0.08)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>🤖 AI Attendance Insight</h3>
-                      <button onClick={fetchAiInsight} disabled={aiLoading} style={btnPrimary}>{aiLoading ? "Analyzing..." : "Get AI Insight"}</button>
+                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: SEENKA.textPrimary }}>🤖 AI Attendance Insight</h3>
+                      <GradientButton onClick={fetchAiInsight} disabled={aiLoading}>{aiLoading ? "Analyzing..." : "Get AI Insight"}</GradientButton>
                     </div>
                     {aiInsight
-                      ? <div style={{ padding: "12px 16px", background: "#ede9fe", borderRadius: 10, color: "#4338ca", fontSize: 14, lineHeight: 1.7 }}>{aiInsight}</div>
-                      : <p style={{ color: textMuted, fontSize: 14, margin: 0 }}>Click "Get AI Insight" to analyze your class attendance with AI.</p>}
+                      ? <div style={{ padding: "12px 16px", background: "linear-gradient(135deg, rgba(0,163,255,0.08), rgba(168,85,247,0.08))", borderRadius: 10, color: SEENKA.textPrimary, fontSize: 14, lineHeight: 1.7, border: `1px solid rgba(0,163,255,0.15)` }}>{aiInsight}</div>
+                      : <p style={{ color: SEENKA.textMuted, fontSize: 14, margin: 0 }}>Click "Get AI Insight" to analyze your class attendance with AI.</p>}
                   </div>
 
                   <div style={card}>
@@ -458,8 +458,8 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: "1rem" }}>
-                    {[["✅ All Present", "present", COLORS.present], ["⏰ All Late", "late", COLORS.late], ["❌ All Absent", "absent", COLORS.absent], ["📋 All Excused", "excused", COLORS.excused]].map(([label, status, color]) => (
-                      <button key={status} onClick={() => markAll(status)} style={{ padding: "8px", borderRadius: 8, border: `1px solid ${color}40`, background: `${color}18`, color: color, fontWeight: 700, cursor: "pointer", fontSize: 12 }}>{label}</button>
+                    {[["✅ All Present", "present", SEENKA.present], ["⏰ All Late", "late", SEENKA.late], ["❌ All Absent", "absent", SEENKA.absent], ["📋 All Excused", "excused", SEENKA.excused]].map(([label, status, color]) => (
+                      <button key={status} onClick={() => markAll(status)} style={{ padding: "8px", borderRadius: 8, border: `1px solid ${color}40`, background: `${color}15`, color: color, fontWeight: 700, cursor: "pointer", fontSize: 12 }}>{label}</button>
                     ))}
                   </div>
 
@@ -475,10 +475,10 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: "1rem" }}>
-                    {[["Total", todayStats.total, accent], ["Present", todayStats.present, COLORS.present], ["Late", todayStats.late, COLORS.late], ["Absent", todayStats.absent, COLORS.absent], ["Excused", todayStats.excused, COLORS.excused]].map(([l, v, c]) => (
-                      <div key={l} style={{ background: surface, border: `1px solid ${border}`, borderRadius: 10, padding: "8px 12px", textAlign: "center" }}>
+                    {[["Total", todayStats.total, SEENKA.electricBlue], ["Present", todayStats.present, SEENKA.present], ["Late", todayStats.late, SEENKA.late], ["Absent", todayStats.absent, SEENKA.absent], ["Excused", todayStats.excused, SEENKA.excused]].map(([l, v, c]) => (
+                      <div key={l} style={{ background: "rgba(17,24,39,0.9)", border: `1px solid ${c}30`, borderRadius: 10, padding: "8px 12px", textAlign: "center", boxShadow: `0 0 12px ${c}15` }}>
                         <div style={{ fontSize: 20, fontWeight: 800, color: c }}>{v}</div>
-                        <div style={{ fontSize: 11, color: textMuted }}>{l}</div>
+                        <div style={{ fontSize: 11, color: SEENKA.textMuted }}>{l}</div>
                       </div>
                     ))}
                   </div>
@@ -494,7 +494,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                         const status = todayAttendance[student.id];
                         const rate = getAttendanceRate(student.id);
                         return (
-                          <div key={student.id} style={{ background: surface, border: `1.5px solid ${status ? COLORS[status] + "50" : border}`, borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s" }}>
+                          <div key={student.id} style={{ background: "rgba(17,24,39,0.9)", border: `1.5px solid ${status ? COLORS[status] + "40" : SEENKA.darkBorder}`, borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s", boxShadow: status ? `0 0 16px ${COLORS[status]}15` : "none" }}>
                             <Avatar name={student.name} size={40} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontWeight: 700, fontSize: 15 }}>{student.name}</div>
@@ -504,13 +504,13 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
                             {quickMode ? (
                               <div style={{ display: "flex", gap: 6 }}>
                                 {[["present","✅"], ["late","⏰"], ["absent","❌"], ["excused","📋"]].map(([s, icon]) => (
-                                  <button key={s} onClick={() => { setTodayAttendance(prev => ({ ...prev, [student.id]: s })); setSaved(false); }} style={{ width: 34, height: 34, borderRadius: 8, border: `2px solid ${status === s ? COLORS[s] : border}`, background: status === s ? COLORS[s] : "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</button>
+                                  <button key={s} onClick={() => { setTodayAttendance(prev => ({ ...prev, [student.id]: s })); setSaved(false); }} style={{ width: 34, height: 34, borderRadius: 8, border: `2px solid ${status === s ? COLORS[s] : SEENKA.darkBorder}`, background: status === s ? COLORS[s] + "30" : "none", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: status === s ? `0 0 10px ${COLORS[s]}50` : "none" }}>{icon}</button>
                                 ))}
                               </div>
                             ) : (
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                                {[["present","Present",COLORS.present], ["late","Late",COLORS.late], ["absent","Absent",COLORS.absent], ["excused","Excused",COLORS.excused]].map(([s, label, color]) => (
-                                  <button key={s} onClick={() => { setTodayAttendance(prev => ({ ...prev, [student.id]: s })); setSaved(false); }} style={{ padding: "5px 12px", borderRadius: 20, border: `2px solid ${status === s ? color : border}`, background: status === s ? color : "none", color: status === s ? "#fff" : textMuted, cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.1s" }}>{label}</button>
+                                {[["present","Present",SEENKA.present], ["late","Late",SEENKA.late], ["absent","Absent",SEENKA.absent], ["excused","Excused",SEENKA.excused]].map(([s, label, color]) => (
+                                  <button key={s} onClick={() => { setTodayAttendance(prev => ({ ...prev, [student.id]: s })); setSaved(false); }} style={{ padding: "5px 12px", borderRadius: 20, border: `1.5px solid ${status === s ? color : SEENKA.darkBorder}`, background: status === s ? color + "25" : "none", color: status === s ? color : SEENKA.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 700, transition: "all 0.1s", boxShadow: status === s ? `0 0 10px ${color}40` : "none" }}>{label}</button>
                                 ))}
                               </div>
                             )}
@@ -753,8 +753,8 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
               <div style={card}>
                 <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700 }}>🔥 Firebase Status</h3>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: COLORS.present }} />
-                  <span style={{ fontSize: 14, color: textMuted }}>Connected to Firebase — edutrak-f6e7b</span>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: SEENKA.present, boxShadow: `0 0 8px ${SEENKA.present}` }} />
+                  <span style={{ fontSize: 14, color: SEENKA.textMuted }}>Connected to Firebase — edutrak-f6e7b</span>
                 </div>
               </div>
             </div>

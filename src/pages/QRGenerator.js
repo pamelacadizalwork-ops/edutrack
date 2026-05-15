@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { db } from "../firebase/config";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { QRCodeDisplay } from "../components/QRCode";
+import { GradientButton, SEENKA } from "../components/SeenKaTheme";
 
 export default function QRGenerator({ user, classes, students, dark }) {
   const [selectedClass, setSelectedClass] = useState(classes[0] || null);
@@ -12,14 +13,14 @@ export default function QRGenerator({ user, classes, students, dark }) {
   const [expiryMinutes, setExpiryMinutes] = useState(15);
   const timerRef = useRef(null);
 
-  const accent = "#4f46e5";
-  const surface = dark ? "#1e293b" : "#ffffff";
-  const surface2 = dark ? "#334155" : "#f1f5f9";
-  const border = dark ? "#334155" : "#e2e8f0";
-  const text = dark ? "#f1f5f9" : "#0f172a";
-  const textMuted = dark ? "#94a3b8" : "#64748b";
-  const card = { background: surface, border: `1px solid ${border}`, borderRadius: 16, padding: "1.5rem", marginBottom: "1rem" };
-  const inputStyle = { width: "100%", padding: "9px 13px", borderRadius: 9, border: `1.5px solid ${border}`, background: dark ? "#0f172a" : "#f8fafc", color: text, fontSize: 14, outline: "none", boxSizing: "border-box" };
+  const accent = SEENKA.electricBlue;
+  const surface = SEENKA.darkCard;
+  const surface2 = SEENKA.darkCardElevated;
+  const border = SEENKA.darkBorder;
+  const text = SEENKA.textPrimary;
+  const textMuted = SEENKA.textMuted;
+  const card = { background: "rgba(17,24,39,0.9)", border: `1px solid ${SEENKA.darkBorder}`, borderRadius: 16, padding: "1.5rem", marginBottom: "1rem", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" };
+  const inputStyle = { width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${SEENKA.darkBorder}`, background: "rgba(255,255,255,0.04)", color: SEENKA.textPrimary, fontSize: 14, outline: "none", boxSizing: "border-box" };
 
   // Update selectedClass when classes load
   useEffect(() => {
@@ -142,7 +143,7 @@ export default function QRGenerator({ user, classes, students, dark }) {
 
   const classStudents = selectedClass ? students.filter(s => s.section === selectedClass.section) : [];
   const notYetScanned = classStudents.filter(s => !scannedStudents.find(sc => sc.studentId === s.id));
-  const timerColor = timeLeft > 120 ? "#22c55e" : timeLeft > 60 ? "#f59e0b" : "#ef4444";
+  const timerColor = timeLeft > 120 ? SEENKA.present : timeLeft > 60 ? SEENKA.late : SEENKA.absent;
 
   if (classes.length === 0) {
     return (
@@ -189,20 +190,13 @@ export default function QRGenerator({ user, classes, students, dark }) {
         </div>
 
         {!qrSession ? (
-          <button
-            onClick={generateQR}
-            disabled={generating}
-            style={{ background: accent, color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", cursor: "pointer", fontWeight: 700, fontSize: 15, opacity: generating ? 0.7 : 1 }}
-          >
+          <GradientButton onClick={generateQR} disabled={generating}>
             {generating ? "⏳ Generating..." : "🔲 Generate QR Code"}
-          </button>
+          </GradientButton>
         ) : (
-          <button
-            onClick={stopQR}
-            style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", cursor: "pointer", fontWeight: 700, fontSize: 15 }}
-          >
+          <GradientButton onClick={stopQR} variant="danger">
             ⏹ Stop & Save Attendance
-          </button>
+          </GradientButton>
         )}
       </div>
 
