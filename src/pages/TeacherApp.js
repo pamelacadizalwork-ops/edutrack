@@ -32,7 +32,7 @@ function MiniBarChart({ data }) {
 
 export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const [page, setPage] = useState("dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [selectedClass, setSelectedClass] = useState(null);
@@ -52,6 +52,8 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const [classForm, setClassForm] = useState({ name: "", code: "", section: "", schedule: "" });
   const [studentForm, setStudentForm] = useState({ name: "", studentId: "", course: "", section: "", email: "" });
   const [loadingData, setLoadingData] = useState(true);
+  const [editingClass, setEditingClass] = useState(null);
+  const [editClassForm, setEditClassForm] = useState({ name: "", code: "", section: "", schedule: "" });
 
   const todayStr = new Date().toISOString().split("T")[0];
   const accent = "#4f46e5";
@@ -142,6 +144,29 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
       await deleteDoc(doc(db, "students", studentId));
       notify("Student removed");
     } catch (e) { notify("Error removing student", "error"); }
+  };
+
+  const deleteClass = async (classId) => {
+    if (!window.confirm("Delete this class? All attendance records for this class will remain but the class will be removed.")) return;
+    try {
+      await deleteDoc(doc(db, "classes", classId));
+      if (selectedClass?.id === classId) setSelectedClass(null);
+      notify("Class deleted successfully");
+    } catch (e) { notify("Error deleting class", "error"); }
+  };
+
+  const startEditClass = (cls) => {
+    setEditingClass(cls.id);
+    setEditClassForm({ name: cls.name, code: cls.code, section: cls.section, schedule: cls.schedule });
+  };
+
+  const saveEditClass = async () => {
+    if (!editClassForm.name || !editClassForm.section) { notify("Name and section are required", "error"); return; }
+    try {
+      await updateDoc(doc(db, "classes", editingClass), { ...editClassForm, updatedAt: serverTimestamp() });
+      setEditingClass(null);
+      notify("Class updated successfully!");
+    } catch (e) { notify("Error updating class", "error"); }
   };
 
   const saveAttendance = async () => {
@@ -255,45 +280,59 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
         </div>
       )}
 
-      {/* Sidebar */}
-      <div style={{ width: sidebarOpen ? 240 : 64, background: surface, borderRight: `1px solid ${border}`, display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflow: "hidden" }}>
-        <div style={{ padding: "1.25rem 1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, background: accent, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🎓</div>
-          {sidebarOpen && <span style={{ fontWeight: 800, fontSize: 17, color: accent }}>EduTrack</span>}
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 40 }}
+        />
+      )}
+
+      {/* Sidebar - slides in as overlay on all screen sizes */}
+      <div style={{
+        position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 50,
+        width: 240, background: surface, borderRight: `1px solid ${border}`,
+        display: "flex", flexDirection: "column",
+        transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+        transition: "transform 0.25s ease", boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.15)" : "none"
+      }}>
+        <div style={{ padding: "1.25rem 1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, background: accent, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🎓</div>
+            <span style={{ fontWeight: 800, fontSize: 17, color: accent }}>EduTrack</span>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: textMuted, padding: "4px" }}>✕</button>
         </div>
         <nav style={{ flex: 1, padding: "1rem 0.5rem", overflowY: "auto" }}>
           {navItems.map(item => (
-            <button key={item.id} onClick={() => setPage(item.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: "none", background: page === item.id ? "#ede9fe" : "none", color: page === item.id ? accent : textMuted, cursor: "pointer", fontWeight: page === item.id ? 700 : 500, fontSize: 14, marginBottom: 2, textAlign: "left" }}>
+            <button key={item.id} onClick={() => { setPage(item.id); setSidebarOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, border: "none", background: page === item.id ? "#ede9fe" : "none", color: page === item.id ? accent : textMuted, cursor: "pointer", fontWeight: page === item.id ? 700 : 500, fontSize: 14, marginBottom: 2, textAlign: "left" }}>
               <span style={{ fontSize: 18 }}>{item.icon}</span>
-              {sidebarOpen && item.label}
+              {item.label}
             </button>
           ))}
         </nav>
         <div style={{ padding: "1rem 0.75rem", borderTop: `1px solid ${border}` }}>
-          {sidebarOpen && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Avatar name={user.name} size={32} />
-              <div><div style={{ fontSize: 13, fontWeight: 700 }}>{user.name}</div><div style={{ fontSize: 11, color: textMuted }}>Teacher</div></div>
-            </div>
-          )}
-          <button onClick={onSignOut} style={{ ...btnSecondary, width: "100%", fontSize: 12 }}>{sidebarOpen ? "🚪 Sign Out" : "🚪"}</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <Avatar name={user.name} size={32} photoURL={user.photoURL} />
+            <div><div style={{ fontSize: 13, fontWeight: 700 }}>{user.name}</div><div style={{ fontSize: 11, color: textMuted }}>Teacher</div></div>
+          </div>
+          <button onClick={onSignOut} style={{ ...btnSecondary, width: "100%", fontSize: 12 }}>🚪 Sign Out</button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, width: "100%" }}>
         {/* Topbar */}
-        <div style={{ background: surface, borderBottom: `1px solid ${border}`, padding: "0.75rem 1.5rem", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10 }}>
-          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 16, color: text }}>☰</button>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{navItems.find(n => n.id === page)?.label}</h2>
-            <p style={{ margin: 0, fontSize: 12, color: textMuted }}>{new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+        <div style={{ background: surface, borderBottom: `1px solid ${border}`, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
+          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 11px", cursor: "pointer", fontSize: 16, color: text, flexShrink: 0 }}>☰</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{navItems.find(n => n.id === page)?.label}</h2>
+            <p style={{ margin: 0, fontSize: 11, color: textMuted }}>{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>
           </div>
-          {selectedClass && <span style={{ background: "#ede9fe", color: accent, borderRadius: 8, padding: "4px 12px", fontSize: 13, fontWeight: 700 }}>{selectedClass.name}</span>}
-          <button onClick={() => setDark(!dark)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 18 }}>{dark ? "☀️" : "🌙"}</button>
+          <button onClick={() => setDark(!dark)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{dark ? "☀️" : "🌙"}</button>
         </div>
 
-        <div style={{ flex: 1, padding: "1.5rem", overflowY: "auto" }}>
+        <div style={{ flex: 1, padding: "1rem", overflowY: "auto" }}>
 
           {/* DASHBOARD */}
           {page === "dashboard" && (
@@ -495,7 +534,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
               {showAddClass && (
                 <div style={{ ...card, background: "#ede9fe", border: `1px solid #c4b5fd`, marginBottom: "1.5rem" }}>
                   <h3 style={{ margin: "0 0 12px", color: accent, fontSize: 15, fontWeight: 700 }}>Create New Class</h3>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                     {[["Subject Name", "name", "e.g. Data Structures"], ["Subject Code", "code", "e.g. CS301"], ["Section", "section", "e.g. CS3A"], ["Schedule", "schedule", "e.g. MWF 8:00-9:00 AM"]].map(([label, field, placeholder]) => (
                       <div key={field}>
                         <label style={{ fontSize: 12, color: textMuted, fontWeight: 700, display: "block", marginBottom: 4 }}>{label}</label>
@@ -513,18 +552,44 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
               {classes.length === 0
                 ? <div style={{ ...card, textAlign: "center", padding: "3rem" }}><p style={{ color: textMuted }}>No classes yet. Create your first class above!</p></div>
                 : classes.map(cls => (
-                  <div key={cls.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 48, height: 48, background: "#ede9fe", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>📚</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 16 }}>{cls.name}</div>
-                      <div style={{ fontSize: 13, color: textMuted }}>{cls.code} · Section {cls.section}</div>
-                      <div style={{ fontSize: 12, color: textMuted }}>{cls.schedule}</div>
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontWeight: 800, fontSize: 20, color: accent }}>{students.filter(s => s.section === cls.section).length}</div>
-                      <div style={{ fontSize: 11, color: textMuted }}>students</div>
-                    </div>
-                    <button onClick={() => { setSelectedClass(cls); setPage("attendance"); }} style={btnPrimary}>Take Attendance</button>
+                  <div key={cls.id} style={{ ...card, marginBottom: 12 }}>
+                    {editingClass === cls.id ? (
+                      /* Edit Form */
+                      <div>
+                        <h3 style={{ margin: "0 0 12px", color: accent, fontSize: 15, fontWeight: 700 }}>✏️ Edit Class</h3>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 12 }}>
+                          {[["Subject Name", "name"], ["Subject Code", "code"], ["Section", "section"], ["Schedule", "schedule"]].map(([label, field]) => (
+                            <div key={field}>
+                              <label style={{ fontSize: 12, color: textMuted, fontWeight: 700, display: "block", marginBottom: 4 }}>{label}</label>
+                              <input style={inputStyle} value={editClassForm[field]} onChange={e => setEditClassForm(f => ({ ...f, [field]: e.target.value }))} />
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={saveEditClass} style={btnPrimary}>💾 Save Changes</button>
+                          <button onClick={() => setEditingClass(null)} style={btnSecondary}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Class Card */
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                        <div style={{ width: 48, height: 48, background: "#ede9fe", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>📚</div>
+                        <div style={{ flex: 1, minWidth: 120 }}>
+                          <div style={{ fontWeight: 700, fontSize: 15 }}>{cls.name}</div>
+                          <div style={{ fontSize: 13, color: textMuted }}>{cls.code} · Section {cls.section}</div>
+                          <div style={{ fontSize: 12, color: textMuted }}>{cls.schedule}</div>
+                        </div>
+                        <div style={{ textAlign: "center", minWidth: 48 }}>
+                          <div style={{ fontWeight: 800, fontSize: 20, color: accent }}>{students.filter(s => s.section === cls.section).length}</div>
+                          <div style={{ fontSize: 11, color: textMuted }}>students</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button onClick={() => { setSelectedClass(cls); setPage("attendance"); }} style={{ ...btnPrimary, fontSize: 12, padding: "7px 12px" }}>✅ Attend</button>
+                          <button onClick={() => startEditClass(cls)} style={{ background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>✏️ Edit</button>
+                          <button onClick={() => deleteClass(cls.id)} style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>🗑️ Delete</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               }

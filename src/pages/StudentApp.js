@@ -31,7 +31,7 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
   const [studentInfo, setStudentInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notification, setNotification] = useState(null);
 
   const notify = (msg, type = "success") => { setNotification({ msg, type }); setTimeout(() => setNotification(null), 3000); };
@@ -116,49 +116,58 @@ export default function StudentApp({ user, onSignOut, dark, setDark, qrSessionId
         </div>
       )}
 
-      {/* Sidebar */}
-      <div style={{ width: sidebarOpen ? 240 : 64, background: surface, borderRight: `1px solid ${border}`, display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflow: "hidden" }}>
-        <div style={{ padding: "1.25rem 1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, background: accent, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🎓</div>
-          {sidebarOpen && <span style={{ fontWeight: 800, fontSize: 17, color: accent }}>EduTrack</span>}
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 40 }} />
+      )}
+
+      {/* Sidebar - overlay on all screen sizes */}
+      <div style={{
+        position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 50,
+        width: 240, background: surface, borderRight: `1px solid ${border}`,
+        display: "flex", flexDirection: "column",
+        transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+        transition: "transform 0.25s ease", boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.15)" : "none"
+      }}>
+        <div style={{ padding: "1.25rem 1rem", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, background: accent, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🎓</div>
+            <span style={{ fontWeight: 800, fontSize: 17, color: accent }}>EduTrack</span>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: textMuted, padding: "4px" }}>✕</button>
         </div>
         <nav style={{ flex: 1, padding: "1rem 0.5rem" }}>
           {navItems.map(item => (
-            <button key={item.id} onClick={() => setPage(item.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: "none", background: page === item.id ? "#ede9fe" : "none", color: page === item.id ? accent : textMuted, cursor: "pointer", fontWeight: page === item.id ? 700 : 500, fontSize: 14, marginBottom: 2, textAlign: "left" }}>
+            <button key={item.id} onClick={() => { setPage(item.id); setSidebarOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, border: "none", background: page === item.id ? "#ede9fe" : "none", color: page === item.id ? accent : textMuted, cursor: "pointer", fontWeight: page === item.id ? 700 : 500, fontSize: 14, marginBottom: 2, textAlign: "left" }}>
               <span style={{ fontSize: 18 }}>{item.icon}</span>
-              {sidebarOpen && item.label}
+              {item.label}
             </button>
           ))}
         </nav>
         <div style={{ padding: "1rem 0.75rem", borderTop: `1px solid ${border}` }}>
-          {sidebarOpen && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Avatar name={user.name} size={32} />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{user.name}</div>
-                <div style={{ fontSize: 11, color: textMuted }}>Student</div>
-              </div>
-            </div>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <Avatar name={user.name} size={32} photoURL={user.photoURL} />
+            <div><div style={{ fontSize: 13, fontWeight: 700 }}>{user.name}</div><div style={{ fontSize: 11, color: textMuted }}>Student</div></div>
+          </div>
           <button onClick={onSignOut} style={{ background: surface2, color: text, border: `1px solid ${border}`, borderRadius: 9, padding: "8px", cursor: "pointer", fontWeight: 500, fontSize: 12, width: "100%" }}>
-            {sidebarOpen ? "🚪 Sign Out" : "🚪"}
+            🚪 Sign Out
           </button>
         </div>
       </div>
 
       {/* Main */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, width: "100%" }}>
         {/* Topbar */}
-        <div style={{ background: surface, borderBottom: `1px solid ${border}`, padding: "0.75rem 1.5rem", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10 }}>
-          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 16, color: text }}>☰</button>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{navItems.find(n => n.id === page)?.label}</h2>
-            <p style={{ margin: 0, fontSize: 12, color: textMuted }}>{new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+        <div style={{ background: surface, borderBottom: `1px solid ${border}`, padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
+          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 11px", cursor: "pointer", fontSize: 16, color: text, flexShrink: 0 }}>☰</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{navItems.find(n => n.id === page)?.label}</h2>
+            <p style={{ margin: 0, fontSize: 11, color: textMuted }}>{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>
           </div>
-          <button onClick={() => setDark(!dark)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 18 }}>{dark ? "☀️" : "🌙"}</button>
+          <button onClick={() => setDark(!dark)} style={{ background: surface2, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>{dark ? "☀️" : "🌙"}</button>
         </div>
 
-        <div style={{ flex: 1, padding: "1.5rem", overflowY: "auto" }}>
+        <div style={{ flex: 1, padding: "1rem", overflowY: "auto" }}>
 
           {/* QR SCANNER PAGE */}
           {page === "qrscan" && (
