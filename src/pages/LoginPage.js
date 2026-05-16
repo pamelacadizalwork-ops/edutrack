@@ -3,6 +3,8 @@ import { auth, db } from "../firebase/config";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { SeenKaLogo, GradientButton, SEENKA } from "../components/SeenKaTheme";
+import { ProtectedInput } from "../components/ProtectedInput";
+import { validateForm, checkRateLimit, logSuspiciousActivity } from "../utils/protection";
 
 export default function LoginPage({ dark, setDark, qrSessionId }) {
   const [mode, setMode] = useState("login");
@@ -19,16 +21,46 @@ export default function LoginPage({ dark, setDark, qrSessionId }) {
     transition: "border-color 0.2s",
   };
 
+  const [fieldErrors, setFieldErrors] = useState({});
+
   const handleSubmit = async () => {
-    setError(""); setLoading(true);
+    setError("");
+
+    // ── Rate limit: max 5 login attempts per minute ──
+    const rl = checkRateLimit(`login_${form.email}`, 5, 60000);
+    if (!rl.allowed) {
+      setError(`Too many attempts. Please wait ${rl.retryAfter} seconds.`);
+      return;
+    }
+
+    // ── Validate all fields ──
+    const fieldTypes = mode === "register"
+      ? { email: "email", password: "password", name: "name", studentId: role === "student" ? "studentId" : null }
+      : { email: "email", password: "password" };
+
+    const formToValidate = Object.fromEntries(
+      Object.entries(form).filter(([k]) => fieldTypes[k] !== null && fieldTypes[k] !== undefined && fieldTypes[k] !== "" || k === "email" || k === "password")
+    );
+
+    const validation = validateForm(formToValidate, fieldTypes);
+    if (!validation.safe) {
+      setFieldErrors(validation.errors);
+      logSuspiciousActivity(null, "loginForm", JSON.stringify(form), "validation_failed");
+      return;
+    }
+    setFieldErrors({});
+    setLoading(true);
+
     try {
       if (mode === "login") {
-        await signInWithEmailAndPassword(auth, form.email, form.password);
+        await signInWithEmailAndPassword(auth, form.email.trim(), form.password);
       } else {
-        const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
+        const cred = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
         await setDoc(doc(db, "users", cred.user.uid), {
-          name: form.name, email: form.email, role,
-          studentId: role === "student" ? form.studentId : null,
+          name: form.name.trim(),
+          email: form.email.trim(),
+          role,
+          studentId: role === "student" ? form.studentId.trim() : null,
           createdAt: new Date().toISOString()
         });
       }
@@ -109,25 +141,43 @@ export default function LoginPage({ dark, setDark, qrSessionId }) {
         {/* Form fields */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {mode === "register" && (
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: SEENKA.textMuted, display: "block", marginBottom: 6 }}>Full Name</label>
-              <input style={inputStyle} placeholder="e.g. Maria Santos" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} onFocus={e => e.target.style.borderColor = SEENKA.electricBlue} onBlur={e => e.target.style.borderColor = "#1e2d45"} />
-            </div>
+            <ProtectedInput
+              label="Full Name"
+              value={form.name}
+              onChange={v => setForm(f => ({ ...f, name: v }))}
+              fieldType="name"
+              placeholder="e.g. Maria Santos"
+              required={true}
+            />
           )}
           {mode === "register" && role === "student" && (
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: SEENKA.textMuted, display: "block", marginBottom: 6 }}>Student ID</label>
-              <input style={inputStyle} placeholder="e.g. 2024-001" value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} onFocus={e => e.target.style.borderColor = SEENKA.electricBlue} onBlur={e => e.target.style.borderColor = "#1e2d45"} />
-            </div>
+            <ProtectedInput
+              label="Student ID"
+              value={form.studentId}
+              onChange={v => setForm(f => ({ ...f, studentId: v }))}
+              fieldType="studentId"
+              placeholder="e.g. 2024-001"
+              required={true}
+            />
           )}
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: SEENKA.textMuted, display: "block", marginBottom: 6 }}>Email Address</label>
-            <input style={inputStyle} type="email" placeholder="you@college.edu" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} onFocus={e => e.target.style.borderColor = SEENKA.electricBlue} onBlur={e => e.target.style.borderColor = "#1e2d45"} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: SEENKA.textMuted, display: "block", marginBottom: 6 }}>Password</label>
-            <input style={inputStyle} type="password" placeholder="minimum 6 characters" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} onKeyDown={e => e.key === "Enter" && handleSubmit()} onFocus={e => e.target.style.borderColor = SEENKA.electricBlue} onBlur={e => e.target.style.borderColor = "#1e2d45"} />
-          </div>
+          <ProtectedInput
+            label="Email Address"
+            type="email"
+            value={form.email}
+            onChange={v => setForm(f => ({ ...f, email: v }))}
+            fieldType="email"
+            placeholder="you@college.edu"
+            required={true}
+          />
+          <ProtectedInput
+            label="Password"
+            type="password"
+            value={form.password}
+            onChange={v => setForm(f => ({ ...f, password: v }))}
+            fieldType="password"
+            placeholder="minimum 6 characters"
+            required={true}
+          />
         </div>
 
         {error && (
