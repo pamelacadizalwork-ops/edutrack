@@ -146,8 +146,10 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
         createdAt: serverTimestamp()
       };
       const encrypted = encryptClass(classData, user.uid);
-      // Store join code unencrypted so students can look it up
+      // These fields MUST stay unencrypted for student join code lookup
       encrypted.joinCode = joinCode;
+      encrypted.teacherId = user.uid;
+      encrypted.teacherName = user.name;
       await addDoc(collection(db, "classes"), encrypted);
       setClassForm({ name: "", code: "", section: "", schedule: "" });
       setShowAddClass(false);

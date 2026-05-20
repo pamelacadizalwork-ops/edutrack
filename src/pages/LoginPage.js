@@ -27,23 +27,43 @@ export default function LoginPage({ dark, setDark, qrSessionId }) {
 
   // Live join code lookup as student types
   const handleJoinCodeChange = async (val) => {
+    // Strip dashes, spaces, uppercase
     const cleaned = normalizeJoinCode(val);
     setForm(f => ({ ...f, joinCode: val }));
     setFoundClass(null);
-    if (cleaned.length < 6) { setJoinCodeStatus(null); return; }
+    setJoinCodeStatus(null);
+
+    // Only search when we have exactly 6 characters
+    if (cleaned.length < 6) return;
 
     setJoinCodeStatus("checking");
     try {
+      // Search Firestore for matching joinCode (stored unencrypted)
       const q = query(collection(db, "classes"), where("joinCode", "==", cleaned));
       const snap = await getDocs(q);
+
       if (!snap.empty) {
-        const cls = { id: snap.docs[0].id, ...snap.docs[0].data() };
-        setFoundClass(cls);
+        const classDoc = snap.docs[0];
+        const rawData = classDoc.data();
+        // joinCode and teacherId are stored unencrypted
+        // className may be encrypted - just use raw or show generic
+        setFoundClass({
+          id: classDoc.id,
+          ...rawData,
+          // Use unencrypted fields only for display
+          name: rawData.teacherName ? `Class by ${rawData.teacherName}` : "Class found",
+          teacherId: rawData.teacherId,
+          teacherName: rawData.teacherName,
+          joinCode: rawData.joinCode,
+          section: rawData.section || "",
+          course: rawData.course || "",
+        });
         setJoinCodeStatus("found");
       } else {
         setJoinCodeStatus("notfound");
       }
-    } catch {
+    } catch (err) {
+      console.error("Join code lookup error:", err);
       setJoinCodeStatus("notfound");
     }
   };
@@ -89,20 +109,21 @@ export default function LoginPage({ dark, setDark, qrSessionId }) {
             name: form.name.trim(),
             studentId: form.studentId.trim(),
             email: form.email.trim(),
-            course: foundClass.course || "",
-            section: foundClass.section || "",
+            course: "",
+            section: "",
             classId: foundClass.id,
-            className: foundClass.name || "",
+            className: "",
             teacherId: foundClass.teacherId,
             userId: uid,
             joinedAt: new Date().toISOString(),
             createdAt: new Date().toISOString(),
           };
-          // Encrypt and store student record
+          // Encrypt sensitive fields
           const encrypted = encryptStudent(studentData, foundClass.teacherId);
-          encrypted.userId = uid; // keep userId unencrypted for queries
-          encrypted.classId = foundClass.id; // keep classId unencrypted
-          encrypted.teacherId = foundClass.teacherId; // keep teacherId unencrypted
+          // Keep these unencrypted for queries
+          encrypted.userId = uid;
+          encrypted.classId = foundClass.id;
+          encrypted.teacherId = foundClass.teacherId;
           await setDoc(doc(db, "students", uid), encrypted);
         }
       }
@@ -194,8 +215,8 @@ export default function LoginPage({ dark, setDark, qrSessionId }) {
                 <div style={{ marginTop: 8, padding: "10px 14px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 20 }}>📚</span>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: SEENKA.present }}>Class found!</div>
-                    <div style={{ fontSize: 12, color: SEENKA.textMuted }}>{foundClass.name} · {foundClass.teacherName}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: SEENKA.present }}>✅ Class found! You will be enrolled.</div>
+                    <div style={{ fontSize: 12, color: SEENKA.textMuted }}>Teacher: {foundClass.teacherName || "Your instructor"}</div>
                   </div>
                 </div>
               )}
