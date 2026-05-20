@@ -6,6 +6,7 @@ import { SeenKaLogo, GradientButton, GlassCard, StatusBadge, StatCard, SEENKA } 
 import { ProtectedInput, SecurityStatusBanner } from "../components/ProtectedInput";
 import { encryptStudent, decryptStudent, encryptAttendance, decryptAttendance, encryptClass, decryptClass } from "../utils/encryption";
 import { validateForm, sanitizeForAI, checkRateLimit, logSuspiciousActivity } from "../utils/protection";
+import { generateJoinCode, formatJoinCode } from "../utils/joinCode";
 import {
   collection, addDoc, doc, setDoc,
   query, where, onSnapshot, deleteDoc, updateDoc, serverTimestamp
@@ -82,7 +83,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
     return unsub;
   }, [user.uid]);
 
-  // Load students - decrypt on read
+  // Load students for this teacher's classes
   useEffect(() => {
     const q = query(collection(db, "students"), where("teacherId", "==", user.uid));
     const unsub = onSnapshot(q, snap => {
@@ -115,7 +116,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   // Load today's attendance into local state when date/class changes
   useEffect(() => {
     if (!selectedClass) return;
-    const classStudents = students.filter(s => s.section === selectedClass.section);
+    const classStudents = students.filter(s => s.classId === selectedClass.id);
     const existing = attendanceRecords[selectedDate] || {};
     const init = {};
     classStudents.forEach(s => { init[s.id] = existing[s.id] || null; });
@@ -124,7 +125,6 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   }, [selectedDate, selectedClass, students, attendanceRecords]);
 
   const addClass = async () => {
-    // Validate all class fields
     const validation = validateForm(classForm, {
       name: "subjectName", code: "code", section: "section", schedule: "schedule"
     });
@@ -136,14 +136,22 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
       return;
     }
     try {
-      const encrypted = encryptClass(
-        { ...classForm, teacherId: user.uid, teacherName: user.name, createdAt: serverTimestamp() },
-        user.uid
-      );
+      // Generate a unique 6-char join code
+      const joinCode = generateJoinCode();
+      const classData = {
+        ...classForm,
+        joinCode,
+        teacherId: user.uid,
+        teacherName: user.name,
+        createdAt: serverTimestamp()
+      };
+      const encrypted = encryptClass(classData, user.uid);
+      // Store join code unencrypted so students can look it up
+      encrypted.joinCode = joinCode;
       await addDoc(collection(db, "classes"), encrypted);
       setClassForm({ name: "", code: "", section: "", schedule: "" });
       setShowAddClass(false);
-      notify("Class added successfully!");
+      notify(`Class created! Join code: ${joinCode} 🎉`);
     } catch (e) { notify("Error adding class", "error"); }
   };
 
@@ -212,15 +220,16 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
     if (!selectedClass) { notify("Please select a class first", "error"); return; }
     setSaving(true);
     try {
-      const classStudents = students.filter(s => s.section === selectedClass.section);
+      const classStudents = students.filter(s => s.classId === selectedClass.id);
       const promises = classStudents.map(async (student) => {
+        const studentUid = student.userId || student.id;
         const status = todayAttendance[student.id];
         if (!status) return;
-        const docId = `${selectedClass.id}_${student.id}_${selectedDate}`;
+        const docId = `${selectedClass.id}_${studentUid}_${selectedDate}`;
         const record = {
           classId: selectedClass.id,
           className: selectedClass.name,
-          studentId: student.id,
+          studentId: studentUid,
           studentName: student.name,
           section: selectedClass.section,
           date: selectedDate,
@@ -243,7 +252,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const markAll = (status) => {
     if (!selectedClass) return;
     const updated = {};
-    students.filter(s => s.section === selectedClass.section).forEach(s => { updated[s.id] = status; });
+    students.filter(s => s.classId === selectedClass.id).forEach(s => { updated[s.id] = status; });
     setTodayAttendance(prev => ({ ...prev, ...updated }));
     setSaved(false);
   };
@@ -256,7 +265,7 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
     return Math.round((present / dates.length) * 100);
   };
 
-  const classStudents = selectedClass ? students.filter(s => s.section === selectedClass.section) : [];
+  const classStudents = selectedClass ? students.filter(s => s.classId === selectedClass.id) : [];
   const filteredStudents = classStudents.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.studentId?.includes(searchQuery);
     const matchFilter = filterStatus === "all" || todayAttendance[s.id] === filterStatus;
@@ -655,21 +664,52 @@ Provide a concise, encouraging insight for the instructor.`;
                       </div>
                     ) : (
                       /* Class Card */
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                        <div style={{ width: 48, height: 48, background: "#ede9fe", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>📚</div>
-                        <div style={{ flex: 1, minWidth: 120 }}>
-                          <div style={{ fontWeight: 700, fontSize: 15 }}>{cls.name}</div>
-                          <div style={{ fontSize: 13, color: textMuted }}>{cls.code} · Section {cls.section}</div>
-                          <div style={{ fontSize: 12, color: textMuted }}>{cls.schedule}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                          <div style={{ width: 48, height: 48, background: "rgba(0,163,255,0.1)", border: `1px solid rgba(0,163,255,0.2)`, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>📚</div>
+                          <div style={{ flex: 1, minWidth: 120 }}>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: SEENKA.textPrimary }}>{cls.name}</div>
+                            <div style={{ fontSize: 13, color: textMuted }}>{cls.code} · Section {cls.section}</div>
+                            <div style={{ fontSize: 12, color: textMuted }}>{cls.schedule}</div>
+                          </div>
+                          <div style={{ textAlign: "center", minWidth: 48 }}>
+                            <div style={{ fontWeight: 800, fontSize: 20, color: SEENKA.electricBlue }}>{students.filter(s => s.classId === cls.id).length}</div>
+                            <div style={{ fontSize: 11, color: textMuted }}>students</div>
+                          </div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button onClick={() => { setSelectedClass(cls); setPage("attendance"); }} style={{ ...btnPrimary, fontSize: 12, padding: "7px 12px" }}>✅ Attend</button>
+                            <button onClick={() => startEditClass(cls)} style={{ background: "rgba(245,158,11,0.15)", color: SEENKA.late, border: `1px solid rgba(245,158,11,0.3)`, borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>✏️ Edit</button>
+                            <button onClick={() => deleteClass(cls.id)} style={{ background: "rgba(239,68,68,0.15)", color: SEENKA.absent, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>🗑️ Delete</button>
+                          </div>
                         </div>
-                        <div style={{ textAlign: "center", minWidth: 48 }}>
-                          <div style={{ fontWeight: 800, fontSize: 20, color: accent }}>{students.filter(s => s.section === cls.section).length}</div>
-                          <div style={{ fontSize: 11, color: textMuted }}>students</div>
-                        </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button onClick={() => { setSelectedClass(cls); setPage("attendance"); }} style={{ ...btnPrimary, fontSize: 12, padding: "7px 12px" }}>✅ Attend</button>
-                          <button onClick={() => startEditClass(cls)} style={{ background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>✏️ Edit</button>
-                          <button onClick={() => deleteClass(cls.id)} style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>🗑️ Delete</button>
+
+                        {/* Join Code Display */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "linear-gradient(135deg, rgba(0,163,255,0.08), rgba(168,85,247,0.08))", borderRadius: 10, border: "1px solid rgba(0,163,255,0.2)", flexWrap: "wrap" }}>
+                          <div style={{ fontSize: 13 }}>🔑</div>
+                          <div>
+                            <div style={{ fontSize: 10, color: SEENKA.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>Student Join Code</div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 20, color: SEENKA.electricBlue, letterSpacing: 4 }}>{formatJoinCode(cls.joinCode || "------")}</div>
+                          </div>
+                          <div style={{ flex: 1 }} />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(cls.joinCode || "").then(() => notify("Join code copied! Share with your students 📋"));
+                            }}
+                            style={{ background: "rgba(0,163,255,0.15)", color: SEENKA.electricBlue, border: `1px solid rgba(0,163,255,0.3)`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
+                          >
+                            📋 Copy Code
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm("Generate a new join code? The old code will stop working.")) return;
+                              const newCode = generateJoinCode();
+                              await updateDoc(doc(db, "classes", cls.id), { joinCode: newCode });
+                              notify(`New code generated: ${newCode} 🔑`);
+                            }}
+                            style={{ background: "rgba(168,85,247,0.15)", color: SEENKA.neonPurple, border: `1px solid rgba(168,85,247,0.3)`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
+                          >
+                            🔄 New Code
+                          </button>
                         </div>
                       </div>
                     )}
