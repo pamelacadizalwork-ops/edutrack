@@ -74,7 +74,16 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
     const unsub = onSnapshot(q, snap => {
       const data = snap.docs.map(d => {
         const raw = { id: d.id, ...d.data() };
-        return decryptClass(raw, user.uid);
+        // Save unencrypted fields BEFORE decryption so they are not overwritten
+        const joinCode = raw.joinCode;
+        const teacherId = raw.teacherId;
+        const teacherName = raw.teacherName;
+        const decrypted = decryptClass(raw, user.uid);
+        // Restore unencrypted fields after decryption
+        decrypted.joinCode = joinCode;
+        decrypted.teacherId = teacherId;
+        decrypted.teacherName = teacherName;
+        return decrypted;
       });
       setClasses(data);
       if (data.length > 0 && !selectedClass) setSelectedClass(data[0]);

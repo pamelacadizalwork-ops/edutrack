@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { auth, db } from "../firebase/config";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs } from "firebase/firestore";
 import { SeenKaLogo, GradientButton, SEENKA } from "../components/SeenKaTheme";
 import { ProtectedInput } from "../components/ProtectedInput";
 import { validateForm, checkRateLimit, logSuspiciousActivity } from "../utils/protection";
@@ -27,37 +27,37 @@ export default function LoginPage({ dark, setDark, qrSessionId }) {
 
   // Live join code lookup as student types
   const handleJoinCodeChange = async (val) => {
-    // Strip dashes, spaces, uppercase
     const cleaned = normalizeJoinCode(val);
     setForm(f => ({ ...f, joinCode: val }));
     setFoundClass(null);
     setJoinCodeStatus(null);
 
-    // Only search when we have exactly 6 characters
     if (cleaned.length < 6) return;
 
     setJoinCodeStatus("checking");
     try {
-      // Search Firestore for matching joinCode (stored unencrypted)
-      const q = query(collection(db, "classes"), where("joinCode", "==", cleaned));
-      const snap = await getDocs(q);
+      // Fetch ALL classes and compare joinCode in JavaScript
+      const snap = await getDocs(collection(db, "classes"));
 
-      if (!snap.empty) {
-        const classDoc = snap.docs[0];
-        const rawData = classDoc.data();
-        // joinCode and teacherId are stored unencrypted
-        // className may be encrypted - just use raw or show generic
-        setFoundClass({
-          id: classDoc.id,
-          ...rawData,
-          // Use unencrypted fields only for display
-          name: rawData.teacherName ? `Class by ${rawData.teacherName}` : "Class found",
-          teacherId: rawData.teacherId,
-          teacherName: rawData.teacherName,
-          joinCode: rawData.joinCode,
-          section: rawData.section || "",
-          course: rawData.course || "",
-        });
+      console.log("=== JOIN CODE DEBUG ===");
+      console.log("Student entered (cleaned):", cleaned);
+      console.log("Total classes in Firebase:", snap.docs.length);
+
+      let matched = null;
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const storedCode = (data.joinCode || "").toString().trim().toUpperCase().replace(/[-\s]/g, "");
+        console.log(`Class ID: ${d.id} | Stored joinCode raw: "${data.joinCode}" | Normalized: "${storedCode}" | Match: ${storedCode === cleaned}`);
+
+        if (storedCode === cleaned) {
+          matched = { id: d.id, ...data };
+        }
+      });
+
+      console.log("Matched class:", matched ? matched.id : "NONE");
+
+      if (matched) {
+        setFoundClass(matched);
         setJoinCodeStatus("found");
       } else {
         setJoinCodeStatus("notfound");
