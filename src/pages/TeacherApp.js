@@ -8,8 +8,8 @@ import { encryptStudent, decryptStudent, encryptAttendance, decryptAttendance, e
 import { validateForm, sanitizeForAI, checkRateLimit, logSuspiciousActivity } from "../utils/protection";
 import { generateJoinCode, formatJoinCode } from "../utils/joinCode";
 import {
-  collection, addDoc, doc, setDoc,
-  query, where, onSnapshot, deleteDoc, updateDoc, serverTimestamp
+  collection, addDoc, doc, setDoc, getDocs,
+  query, where, onSnapshot, deleteDoc, updateDoc, serverTimestamp, writeBatch
 } from "firebase/firestore";
 
 const COLORS = {
@@ -52,6 +52,8 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
   const [loadingData, setLoadingData] = useState(true);
   const [editingClass, setEditingClass] = useState(null);
   const [editClassForm, setEditClassForm] = useState({ name: "", code: "", section: "", schedule: "" });
+  const [deleteModal, setDeleteModal] = useState(null); // { cls, counts }
+  const [deleting, setDeleting] = useState(false);
 
   const todayStr = new Date().toISOString().split("T")[0];
   const accent = SEENKA.electricBlue;
@@ -203,13 +205,119 @@ export default function TeacherApp({ user, onSignOut, dark, setDark }) {
     } catch (e) { notify("Error removing student", "error"); }
   };
 
-  const deleteClass = async (classId) => {
-    if (!window.confirm("Delete this class? All attendance records for this class will remain but the class will be removed.")) return;
+  // Step 1: Show delete confirmation modal with record counts
+  const confirmDeleteClass = async (cls) => {
     try {
-      await deleteDoc(doc(db, "classes", classId));
-      if (selectedClass?.id === classId) setSelectedClass(null);
-      notify("Class deleted successfully");
-    } catch (e) { notify("Error deleting class", "error"); }
+      // Count attendance records for this class
+      const attendanceSnap = await getDocs(
+        query(collection(db, "attendance"), where("classId", "==", cls.id))
+      );
+      // Count students in this class
+      const studentsSnap = await getDocs(
+        query(collection(db, "students"), where("classId", "==", cls.id))
+      );
+      setDeleteModal({
+        cls,
+        counts: {
+          attendance: attendanceSnap.size,
+          students: studentsSnap.size,
+        }
+      });
+    } catch (e) {
+      notify("Error loading class info", "error");
+    }
+  };
+
+  // Step 2: Archive summary to a JSON file download
+  const archiveClass = async (cls) => {
+    try {
+      // Get all attendance records
+      const attendanceSnap = await getDocs(
+        query(collection(db, "attendance"), where("classId", "==", cls.id))
+      );
+      const studentsSnap = await getDocs(
+        query(collection(db, "students"), where("classId", "==", cls.id))
+      );
+
+      const archive = {
+        archivedAt: new Date().toISOString(),
+        class: {
+          name: cls.name,
+          code: cls.code,
+          section: cls.section,
+          schedule: cls.schedule,
+          joinCode: cls.joinCode,
+        },
+        students: studentsSnap.docs.map(d => {
+          const data = d.data();
+          try { return decryptStudent({ id: d.id, ...data }, user.uid); }
+          catch { return { id: d.id, ...data }; }
+        }),
+        attendanceRecords: attendanceSnap.docs.map(d => {
+          const data = d.data();
+          try { return decryptAttendance({ id: d.id, ...data }, user.uid); }
+          catch { return { id: d.id, ...data }; }
+        }),
+      };
+
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(archive, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `SeenKa_Archive_${cls.name || "Class"}_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      notify("✅ Archive downloaded!");
+    } catch (e) {
+      notify("Error creating archive: " + e.message, "error");
+    }
+  };
+
+  // Step 3: Full cascade delete - removes class, students, and all attendance
+  const executeDeleteClass = async (withArchive = false) => {
+    if (!deleteModal) return;
+    const { cls } = deleteModal;
+
+    if (withArchive) await archiveClass(cls);
+
+    setDeleting(true);
+    try {
+      // Delete in batches of 500 (Firestore limit)
+      const batchDelete = async (snap) => {
+        const batchSize = 400;
+        let processed = 0;
+        while (processed < snap.docs.length) {
+          const batch = writeBatch(db);
+          const chunk = snap.docs.slice(processed, processed + batchSize);
+          chunk.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          processed += batchSize;
+        }
+      };
+
+      // 1. Delete all attendance records for this class
+      const attendanceSnap = await getDocs(
+        query(collection(db, "attendance"), where("classId", "==", cls.id))
+      );
+      await batchDelete(attendanceSnap);
+
+      // 2. Delete all students in this class
+      const studentsSnap = await getDocs(
+        query(collection(db, "students"), where("classId", "==", cls.id))
+      );
+      await batchDelete(studentsSnap);
+
+      // 3. Delete the class document itself
+      await deleteDoc(doc(db, "classes", cls.id));
+
+      if (selectedClass?.id === cls.id) setSelectedClass(null);
+      setDeleteModal(null);
+      notify(`Class "${cls.name}" and all records deleted successfully 🗑️`);
+    } catch (e) {
+      notify("Error deleting: " + e.message, "error");
+    }
+    setDeleting(false);
   };
 
   const startEditClass = (cls) => {
@@ -377,6 +485,75 @@ Provide a concise, encouraging insight for the instructor.`;
       {notification && (
         <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 20px", borderRadius: 12, background: notification.type === "error" ? "rgba(239,68,68,0.15)" : "rgba(16,185,129,0.15)", color: notification.type === "error" ? "#EF4444" : "#10B981", fontWeight: 600, fontSize: 14, boxShadow: notification.type === "error" ? "0 0 20px rgba(239,68,68,0.2)" : "0 0 20px rgba(16,185,129,0.2)", border: `1px solid ${notification.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.3)"}`, backdropFilter: "blur(10px)" }}>
           {notification.type === "error" ? "❌ " : "✅ "}{notification.msg}
+        </div>
+      )}
+
+      {/* ── DELETE CLASS CONFIRMATION MODAL ── */}
+      {deleteModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, backdropFilter: "blur(4px)" }}>
+          <div style={{ background: SEENKA.darkCard, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 20, padding: "2rem", width: "100%", maxWidth: 480, boxShadow: "0 0 60px rgba(239,68,68,0.15)", fontFamily: "system-ui" }}>
+
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>🗑️</div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 18, color: SEENKA.textPrimary }}>Delete Class</div>
+                <div style={{ fontSize: 13, color: SEENKA.textMuted }}>This action cannot be undone</div>
+              </div>
+            </div>
+
+            {/* Class info */}
+            <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: SEENKA.textPrimary, marginBottom: 4 }}>{deleteModal.cls.name}</div>
+              <div style={{ fontSize: 13, color: SEENKA.textMuted }}>{deleteModal.cls.code} · Section {deleteModal.cls.section}</div>
+            </div>
+
+            {/* What will be deleted */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: SEENKA.textMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>The following will be permanently deleted:</div>
+              {[
+                { icon: "📚", label: "The class itself", count: "1 class", color: SEENKA.absent },
+                { icon: "👥", label: "Enrolled students", count: `${deleteModal.counts.students} student${deleteModal.counts.students !== 1 ? "s" : ""}`, color: SEENKA.late },
+                { icon: "📋", label: "All attendance records", count: `${deleteModal.counts.attendance} record${deleteModal.counts.attendance !== 1 ? "s" : ""}`, color: SEENKA.electricBlue },
+              ].map((item, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8, marginBottom: 6, border: `1px solid ${SEENKA.darkBorder}` }}>
+                  <span style={{ fontSize: 18 }}>{item.icon}</span>
+                  <span style={{ flex: 1, fontSize: 14, color: SEENKA.textPrimary }}>{item.label}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: item.color }}>{item.count}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Archive tip */}
+            <div style={{ background: "rgba(0,163,255,0.08)", border: "1px solid rgba(0,163,255,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 20, fontSize: 13, color: SEENKA.textMuted, lineHeight: 1.6 }}>
+              💡 <strong style={{ color: SEENKA.electricBlue }}>Tip:</strong> Click <em>"Archive & Delete"</em> to download a backup JSON file of all records before deleting. You can open it in Excel later.
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                onClick={() => executeDeleteClass(true)}
+                disabled={deleting}
+                style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #00A3FF, #A855F7)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1 }}
+              >
+                {deleting ? "⏳ Processing..." : "📦 Archive & Delete"}
+              </button>
+              <button
+                onClick={() => executeDeleteClass(false)}
+                disabled={deleting}
+                style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "rgba(239,68,68,0.2)", color: SEENKA.absent, fontWeight: 700, fontSize: 13, cursor: deleting ? "not-allowed" : "pointer", border: "1px solid rgba(239,68,68,0.3)", opacity: deleting ? 0.7 : 1 }}
+              >
+                {deleting ? "⏳ Deleting..." : "🗑️ Delete Only"}
+              </button>
+              <button
+                onClick={() => setDeleteModal(null)}
+                disabled={deleting}
+                style={{ width: "100%", padding: "10px", borderRadius: 10, border: `1px solid ${SEENKA.darkBorder}`, background: "rgba(255,255,255,0.04)", color: SEENKA.textMuted, fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -690,7 +867,7 @@ Provide a concise, encouraging insight for the instructor.`;
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             <button onClick={() => { setSelectedClass(cls); setPage("attendance"); }} style={{ ...btnPrimary, fontSize: 12, padding: "7px 12px" }}>✅ Attend</button>
                             <button onClick={() => startEditClass(cls)} style={{ background: "rgba(245,158,11,0.15)", color: SEENKA.late, border: `1px solid rgba(245,158,11,0.3)`, borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>✏️ Edit</button>
-                            <button onClick={() => deleteClass(cls.id)} style={{ background: "rgba(239,68,68,0.15)", color: SEENKA.absent, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>🗑️ Delete</button>
+                            <button onClick={() => confirmDeleteClass(cls)} style={{ background: "rgba(239,68,68,0.15)", color: SEENKA.absent, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>🗑️ Delete</button>
                           </div>
                         </div>
 
